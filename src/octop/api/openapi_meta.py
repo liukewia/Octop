@@ -77,6 +77,7 @@ OPENAPI_TAGS: list[dict[str, str]] = [
     },
     {"name": "envs", "description": "Environment variable presets for agents and workspaces."},
     {"name": "providers", "description": "LLM provider configuration and active model selection."},
+    {"name": "search", "description": "AI web search provider connectivity testing."},
     {"name": "voice", "description": "Speech-to-text and text-to-speech provider configuration."},
     {
         "name": "observability",

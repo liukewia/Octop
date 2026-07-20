@@ -33,6 +33,8 @@ dependencies = [
     "boto3>=1.40.61",
     "harness-browser>=0.7.4",
     "playwright>=1.40",
+    "langchain-tavily==0.2.18",
+    "langchain-community==0.4.2",
 ]
 
 [project.optional-dependencies]

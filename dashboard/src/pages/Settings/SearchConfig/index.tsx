@@ -121,9 +121,10 @@ function ProviderPanel({ provider, envVars, onSaved }: ProviderPanelProps) {
     try {
       setTesting(true);
       const values = (await form.validateFields()) as Record<string, string>;
-      const testEnvs = { ...envVars };
+      const testEnvs: Record<string, string> = {};
       provider.required_keys.forEach((key) => {
-        if (values[key]) testEnvs[key] = values[key];
+        const value = values[key] ?? envVars[key];
+        if (value) testEnvs[key] = value;
       });
       const result = await api.testSearch(provider.id, testEnvs);
       if (result.success) {

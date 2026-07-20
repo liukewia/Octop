@@ -2168,7 +2168,7 @@ wheels = [
 
 [[package]]
 name = "octop"
-version = "0.9.10"
+version = "0.9.11"
 source = { editable = "." }
 dependencies = [
     { name = "acme" },
@@ -2182,7 +2182,9 @@ dependencies = [
     { name = "harness-browser" },
     { name = "harness-gateway" },
     { name = "josepy" },
+    { name = "langchain-community" },
     { name = "langchain-core" },
+    { name = "langchain-tavily" },
     { name = "orcakit-harness-agent", extra = ["all"] },
     { name = "playwright" },
     { name = "pydantic" },
@@ -2240,7 +2242,9 @@ requires-dist = [
     { name = "harness-gateway", specifier = ">=0.8.4" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27" },
     { name = "josepy", specifier = ">=2.2.0" },
+    { name = "langchain-community", specifier = "==0.4.2" },
     { name = "langchain-core", specifier = ">=1.4.8" },
+    { name = "langchain-tavily", specifier = "==0.2.18" },
     { name = "mss", marker = "extra == 'desktop'", specifier = ">=9.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.10" },
     { name = "orcakit-harness-agent", extras = ["all"], specifier = ">=0.9.10" },
