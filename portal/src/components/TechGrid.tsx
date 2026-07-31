@@ -1,6 +1,5 @@
 import { useRef, useEffect, useState } from "react";
-import { useLang } from "@/store/lang";
-import { createT } from "@/i18n";
+import { useTranslation } from "react-i18next";
 import styles from "./TechGrid.module.less";
 
 const TECH_ITEMS = [
@@ -15,8 +14,7 @@ const TECH_ITEMS = [
 ] as const;
 
 export function TechGrid() {
-  const locale = useLang((s) => s.locale);
-  const t = createT(locale);
+  const { t } = useTranslation();
   const sectionRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
 

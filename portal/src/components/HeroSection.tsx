@@ -1,14 +1,12 @@
 import { useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { ParticleCanvas } from "@/components/ParticleCanvas";
 import { OctopOrbit } from "@/components/OctopOrbit";
-import { useLang } from "@/store/lang";
-import { createT } from "@/i18n";
 import logoSvg from "/logo.svg";
 import styles from "./HeroSection.module.less";
 
 export function HeroSection() {
-  const locale = useLang((s) => s.locale);
-  const t = createT(locale);
+  const { t, i18n } = useTranslation();
 
   const title1Ref = useRef<HTMLSpanElement>(null);
   const title2Ref = useRef<HTMLSpanElement>(null);
@@ -29,7 +27,7 @@ export function HeroSection() {
         ref.current.style.transform = "translateY(0)";
       }, i * 150 + 200);
     });
-  }, [locale]);
+  }, [i18n.language]);
 
   const scrollDown = () => {
     window.scrollBy({ top: window.innerHeight * 0.9, behavior: "smooth" });

@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useLang } from "@/store/lang";
-import { createT } from "@/i18n";
+import { useTranslation } from "react-i18next";
 import styles from "./StatsSection.module.less";
 
 interface StatItem {
@@ -48,8 +47,7 @@ function useCountUp(target: string, active: boolean) {
 }
 
 function StatCard({ valueKey, labelKey }: StatItem) {
-  const locale = useLang((s) => s.locale);
-  const t = createT(locale);
+  const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(false);
   const rawValue = t(valueKey);

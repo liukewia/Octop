@@ -1,13 +1,12 @@
 import { useState, useEffect } from "react";
-import { useLang } from "@/store/lang";
-import { createT } from "@/i18n";
+import { useTranslation } from "react-i18next";
+import { changeLocale } from "@/i18n";
+import { readStoredUiLocale, type UiLocale } from "@/utils/localePrefs";
 import logoSvg from "/logo.svg";
 import styles from "./Navbar.module.less";
 
 export function Navbar() {
-  const locale = useLang((s) => s.locale);
-  const toggle = useLang((s) => s.toggle);
-  const t = createT(locale);
+  const { t, i18n } = useTranslation();
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -18,6 +17,13 @@ export function Navbar() {
 
   const scrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const handleToggleLang = () => {
+    const stored = readStoredUiLocale();
+    const current = (stored ?? i18n.language) as UiLocale;
+    const next: UiLocale = current === "en" ? "zh" : "en";
+    void changeLocale(next);
   };
 
   return (
@@ -41,7 +47,7 @@ export function Navbar() {
         </div>
 
         <div className={styles.actions}>
-          <button className={styles.langBtn} onClick={toggle}>
+          <button className={styles.langBtn} onClick={handleToggleLang}>
             {t("nav.lang")}
           </button>
           <a

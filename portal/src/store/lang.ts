@@ -1,26 +1,12 @@
-import { create } from "zustand";
-import type { Locale } from "@/i18n";
-
-interface LangState {
-  locale: Locale;
-  toggle: () => void;
-  setLocale: (l: Locale) => void;
-}
-
-const saved = (typeof localStorage !== "undefined" && localStorage.getItem("octop_locale")) as
-  | Locale
-  | null;
-
-export const useLang = create<LangState>((set) => ({
-  locale: saved ?? "en",
-  toggle: () =>
-    set((s) => {
-      const next: Locale = s.locale === "en" ? "zh" : "en";
-      localStorage.setItem("octop_locale", next);
-      return { locale: next };
-    }),
-  setLocale: (l) => {
-    localStorage.setItem("octop_locale", l);
-    set({ locale: l });
-  },
-}));
+/**
+ * Language toggle helper — thin wrapper around i18next + localePrefs.
+ * Use `useTranslation()` from react-i18next directly in components.
+ * This module is kept for any code that needs programmatic locale access.
+ */
+export { changeLocale, ensureLocaleBundle } from "@/i18n";
+export {
+  readStoredUiLocale,
+  storeUiLocale,
+  resolveInitialLocale,
+  type UiLocale,
+} from "@/utils/localePrefs";

@@ -1,6 +1,5 @@
 import { useEffect, useRef, useCallback } from "react";
-import { useLang } from "@/store/lang";
-import { createT } from "@/i18n";
+import { useTranslation } from "react-i18next";
 import styles from "./ChannelsSection.module.less";
 
 const CHANNELS = [
@@ -94,8 +93,7 @@ function OrbitCanvas({ count }: { count: number }) {
 }
 
 export function ChannelsSection() {
-  const locale = useLang((s) => s.locale);
-  const t = createT(locale);
+  const { t } = useTranslation();
 
   return (
     <section className={styles.section} id="channels">

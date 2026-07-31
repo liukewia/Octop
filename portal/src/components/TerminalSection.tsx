@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useLang } from "@/store/lang";
-import { createT } from "@/i18n";
+import { useTranslation } from "react-i18next";
 import styles from "./TerminalSection.module.less";
 
 const INSTALL_STEPS = [
@@ -19,8 +18,7 @@ const INSTALL_STEPS = [
 ] as const;
 
 export function TerminalSection() {
-  const locale = useLang((s) => s.locale);
-  const t = createT(locale);
+  const { t } = useTranslation();
   const [lines, setLines] = useState<typeof INSTALL_STEPS[number][]>([]);
   const [cursor, setCursor] = useState(true);
   const [started, setStarted] = useState(false);
@@ -94,7 +92,7 @@ export function TerminalSection() {
               <div className={styles.stepText}>
                 <span className={styles.stepNum}>0{i + 1}</span>
                 <span className={styles.stepLabel}>
-                  {t(`install.step${i + 1}` as `install.step${1 | 2 | 3 | 4}`)}
+                  {t(`install.step${i + 1}`)}
                 </span>
               </div>
               {i < 3 && <div className={styles.connector} />}

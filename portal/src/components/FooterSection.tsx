@@ -1,11 +1,9 @@
-import { useLang } from "@/store/lang";
-import { createT } from "@/i18n";
+import { useTranslation } from "react-i18next";
 import logoSvg from "/logo.svg";
 import styles from "./FooterSection.module.less";
 
 export function FooterSection() {
-  const locale = useLang((s) => s.locale);
-  const t = createT(locale);
+  const { t } = useTranslation();
 
   return (
     <footer className={styles.footer}>
