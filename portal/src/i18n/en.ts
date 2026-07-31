@@ -1,0 +1,83 @@
+export default {
+  nav: {
+    features: "Features",
+    channels: "Channels",
+    install: "Install",
+    github: "GitHub",
+    lang: "中文",
+  },
+  hero: {
+    badge: "Self-Hosted · Open Source · Multi-Agent",
+    title1: "Your Self-Hosted",
+    title2: "AI Companion",
+    subtitle: "Multi-agent · Multi-user · Multi-channel · 100% Local",
+    desc: "Built for teams that care about data sovereignty. Deploy once, run everywhere — all models, all channels, zero vendor lock-in.",
+    cta_primary: "Get Started Free",
+    cta_secondary: "Star on GitHub",
+    scroll: "Scroll to explore",
+  },
+  stats: {
+    channels: "IM Channels",
+    personas: "MBTI Personas",
+    command: "One Command",
+    local: "Local Data",
+    channels_val: "6+",
+    personas_val: "16",
+    command_val: "1",
+    local_val: "100%",
+  },
+  features: {
+    title: "Everything you need",
+    subtitle: "Four pillars that make Octop the AI assistant your team actually wants to use.",
+    companion: {
+      title: "Companion",
+      desc: "Warm AI that greets, adapts, and grows with you. 16 MBTI personas let every team member pick their style.",
+    },
+    focus: {
+      title: "Focus",
+      desc: "Processes files, instructions & feedback — always in flow. Shell guard, PII masking, and JWT isolation built in.",
+    },
+    connect: {
+      title: "Connect",
+      desc: "Skills, files, and expert tools — wired together seamlessly across 6+ IM channels with zero config.",
+    },
+    create: {
+      title: "Create",
+      desc: "Learns your style. Evolves into your personal intelligent workspace with portable memory and ACP protocol.",
+    },
+  },
+  tech: {
+    title: "Powered by",
+    subtitle: "Production-grade capabilities out of the box.",
+    items: {
+      multi_agent: { title: "Multi-Agent", desc: "Isolated workspaces, concurrent execution" },
+      security: { title: "Security Built-in", desc: "JWT · Shell Guard · PII Masking" },
+      channels: { title: "6+ IM Channels", desc: "Feishu · DingTalk · QQ · Discord · WeCom" },
+      memory: { title: "Portable Memory", desc: "Memory travels with workspace migration" },
+      terminal: { title: "Terminal AI+", desc: "AI-assisted CLI in your browser" },
+      browser: { title: "Browser AI+", desc: "Headless Chromium automation" },
+      desktop: { title: "Remote Desktop", desc: "Cross-platform desktop control" },
+      acp: { title: "ACP Protocol", desc: "Bidirectional IDE integration" },
+    },
+  },
+  install: {
+    title: "Up and running in 60 seconds",
+    subtitle: "One command. No Docker required.",
+    step1: "Install",
+    step2: "Init",
+    step3: "Run",
+    step4: "Chat",
+    copy: "Copy",
+    copied: "Copied!",
+  },
+  channels: {
+    title: "Connect everywhere",
+    subtitle: "One AI brain, every channel your team already uses.",
+  },
+  footer: {
+    tagline: "Start your self-hosted AI journey today.",
+    cta_primary: "Star on GitHub",
+    cta_secondary: "Read Docs",
+    copyright: "© 2025 Octop. Open Source under MIT License.",
+  },
+} as const;

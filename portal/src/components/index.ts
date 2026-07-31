@@ -1,5 +1,10 @@
-/**
- * Shared UI building blocks live here.
- *
- * Convention: one component per directory, exported via index.tsx.
- */
+export { Navbar } from "./Navbar";
+export { HeroSection } from "./HeroSection";
+export { ParticleCanvas } from "./ParticleCanvas";
+export { OctopOrbit } from "./OctopOrbit";
+export { StatsSection } from "./StatsSection";
+export { FeaturesSection } from "./FeaturesSection";
+export { TechGrid } from "./TechGrid";
+export { TerminalSection } from "./TerminalSection";
+export { ChannelsSection } from "./ChannelsSection";
+export { FooterSection } from "./FooterSection";

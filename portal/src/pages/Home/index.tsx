@@ -1,7 +1,21 @@
+import { HeroSection } from "@/components/HeroSection";
+import { StatsSection } from "@/components/StatsSection";
+import { FeaturesSection } from "@/components/FeaturesSection";
+import { TechGrid } from "@/components/TechGrid";
+import { TerminalSection } from "@/components/TerminalSection";
+import { ChannelsSection } from "@/components/ChannelsSection";
+import { FooterSection } from "@/components/FooterSection";
+
 export function HomePage() {
   return (
-    <main style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <h1>Octop Portal</h1>
+    <main>
+      <HeroSection />
+      <StatsSection />
+      <FeaturesSection />
+      <TechGrid />
+      <TerminalSection />
+      <ChannelsSection />
+      <FooterSection />
     </main>
   );
 }

@@ -1,0 +1,184 @@
+.section {
+  background: #0a0e1a;
+  padding: 100px 48px;
+}
+
+.header {
+  text-align: center;
+  max-width: 600px;
+  margin: 0 auto 56px;
+}
+
+.title {
+  font-size: clamp(1.8rem, 3.5vw, 2.6rem);
+  font-weight: 800;
+  color: #f0f4ff;
+  margin-bottom: 14px;
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  font-size: 1rem;
+  color: rgba(140, 170, 200, 0.65);
+}
+
+.layout {
+  display: flex;
+  align-items: center;
+  gap: 56px;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+/* Steps */
+.steps {
+  flex: 0 0 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  position: relative;
+}
+
+.stepIcon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(0, 212, 255, 0.1);
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  color: #00d4ff;
+  flex-shrink: 0;
+  z-index: 1;
+}
+
+.stepText {
+  display: flex;
+  flex-direction: column;
+}
+
+.stepNum {
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 0.7rem;
+  color: rgba(0, 212, 255, 0.5);
+  letter-spacing: 0.08em;
+}
+
+.stepLabel {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #c8d8f0;
+}
+
+.connector {
+  position: absolute;
+  left: 22px;
+  top: 44px;
+  width: 1px;
+  height: 32px;
+  background: linear-gradient(180deg, rgba(0, 212, 255, 0.3), rgba(0, 212, 255, 0.05));
+}
+
+/* Terminal */
+.terminalWrap {
+  flex: 1;
+  background: #0d1117;
+  border: 1px solid rgba(30, 50, 70, 0.9);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 212, 255, 0.05);
+}
+
+.termHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #161b22;
+  border-bottom: 1px solid rgba(30, 50, 70, 0.9);
+}
+
+.dots {
+  display: flex;
+  gap: 6px;
+}
+
+.dotRed, .dotYellow, .dotGreen {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+.dotRed { background: #ff5f57; }
+.dotYellow { background: #febc2e; }
+.dotGreen { background: #28c840; }
+
+.termTitle {
+  flex: 1;
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 0.78rem;
+  color: rgba(120, 150, 180, 0.6);
+  text-align: center;
+}
+
+.copyBtn {
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 0.72rem;
+  color: #00d4ff;
+  background: rgba(0, 212, 255, 0.08);
+  border: 1px solid rgba(0, 212, 255, 0.2);
+  border-radius: 6px;
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.copyBtn:hover {
+  background: rgba(0, 212, 255, 0.15);
+}
+
+.termBody {
+  padding: 20px 24px 24px;
+  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+  font-size: 0.85rem;
+  line-height: 1.8;
+  min-height: 260px;
+  max-height: 360px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.termBody::-webkit-scrollbar { display: none; }
+
+.termLine {
+  white-space: pre;
+}
+
+.type_cmd { color: #e0eaff; }
+.type_ok { color: #4ade80; }
+.type_info { color: rgba(140, 170, 200, 0.65); }
+.type_blank { height: 6px; }
+
+.termCursor {
+  color: rgba(0, 212, 255, 0);
+  font-size: 0.85rem;
+  transition: color 0.1s ease;
+}
+
+.cursorOn {
+  color: #00d4ff;
+}
+
+@media (max-width: 800px) {
+  .layout { flex-direction: column; }
+  .steps { flex-direction: row; flex: auto; width: 100%; }
+  .connector { display: none; }
+  .section { padding: 60px 20px; }
+}

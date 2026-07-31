@@ -1,0 +1,115 @@
+.footer {
+  position: relative;
+  background: #070b14;
+  padding: 100px 48px 60px;
+  overflow: hidden;
+  border-top: 1px solid rgba(0, 212, 255, 0.08);
+}
+
+.bgOctop {
+  position: absolute;
+  right: -40px;
+  bottom: -20px;
+  width: 420px;
+  height: 420px;
+  pointer-events: none;
+}
+
+.octopBg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0.18;
+  object-position: bottom right;
+  filter: blur(1px) saturate(0.6);
+}
+
+.gradient {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to right,
+    #070b14 30%,
+    rgba(7, 11, 20, 0.4) 70%,
+    transparent 100%
+  );
+}
+
+.content {
+  position: relative;
+  z-index: 2;
+  max-width: 700px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.tagline {
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  font-weight: 800;
+  color: #f0f4ff;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+}
+
+.ctas {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.ctaPrimary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 32px;
+  background: linear-gradient(135deg, #ffd700 0%, #ff9f3f 100%);
+  color: #0a0e1a;
+  font-weight: 800;
+  font-size: 1rem;
+  border-radius: 12px;
+  text-decoration: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 4px 24px rgba(255, 215, 0, 0.3);
+}
+
+.ctaPrimary:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 32px rgba(255, 215, 0, 0.45);
+}
+
+.star {
+  font-size: 1.1rem;
+}
+
+.ctaSecondary {
+  display: inline-flex;
+  align-items: center;
+  padding: 14px 28px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #f0f4ff;
+  font-weight: 600;
+  font-size: 1rem;
+  border-radius: 12px;
+  text-decoration: none;
+  transition: background 0.2s ease, transform 0.2s ease;
+  backdrop-filter: blur(8px);
+}
+
+.ctaSecondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-3px);
+}
+
+.copy {
+  font-size: 0.82rem;
+  color: rgba(100, 130, 160, 0.55);
+}
+
+@media (max-width: 640px) {
+  .footer { padding: 60px 20px 48px; }
+  .bgOctop { width: 260px; height: 260px; right: -20px; bottom: 0; }
+}
