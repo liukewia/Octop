@@ -3,8 +3,8 @@ import { ParticleCanvas } from "@/components/ParticleCanvas";
 import { OctopOrbit } from "@/components/OctopOrbit";
 import { useLang } from "@/store/lang";
 import { createT } from "@/i18n";
-import octopImg from "/octop.png";
-import styles from "./HeroSection.module.css";
+import logoSvg from "/logo.svg";
+import styles from "./HeroSection.module.less";
 
 export function HeroSection() {
   const locale = useLang((s) => s.locale);
@@ -90,7 +90,7 @@ export function HeroSection() {
         <div className={styles.octopSide}>
           <div className={styles.octopWrapper}>
             <OctopOrbit />
-            <img src={octopImg} alt="Octop mascot" className={styles.octopImg} />
+            <img src={logoSvg} alt="Octop mascot" className={styles.octopImg} />
           </div>
         </div>
       </div>

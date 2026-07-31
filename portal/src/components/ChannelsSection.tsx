@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from "react";
 import { useLang } from "@/store/lang";
 import { createT } from "@/i18n";
-import styles from "./ChannelsSection.module.css";
+import styles from "./ChannelsSection.module.less";
 
 const CHANNELS = [
   { name: "Feishu", icon: "🚀", color: "#00A2FF" },

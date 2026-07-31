@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState } from "react";
 import { useLang } from "@/store/lang";
 import { createT } from "@/i18n";
-import styles from "./TechGrid.module.css";
+import styles from "./TechGrid.module.less";
 
 const TECH_ITEMS = [
   { key: "multi_agent", icon: "◈", color: "#FF6B4A" },

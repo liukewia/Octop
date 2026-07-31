@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useLang } from "@/store/lang";
 import { createT } from "@/i18n";
-import styles from "./TerminalSection.module.css";
+import styles from "./TerminalSection.module.less";
 
 const INSTALL_STEPS = [
   { delay: 0, text: "$ curl -fsSL https://get.octop.ai/install.sh | bash", type: "cmd" },

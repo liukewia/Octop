@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState } from "react";
 import { useLang } from "@/store/lang";
 import { createT } from "@/i18n";
-import styles from "./FeaturesSection.module.css";
+import styles from "./FeaturesSection.module.less";
 
 const FEATURES = [
   {

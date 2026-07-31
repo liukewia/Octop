@@ -1,7 +1,7 @@
 import { useLang } from "@/store/lang";
 import { createT } from "@/i18n";
-import octopImg from "/octop.png";
-import styles from "./FooterSection.module.css";
+import logoSvg from "/logo.svg";
+import styles from "./FooterSection.module.less";
 
 export function FooterSection() {
   const locale = useLang((s) => s.locale);
@@ -10,7 +10,7 @@ export function FooterSection() {
   return (
     <footer className={styles.footer}>
       <div className={styles.bgOctop}>
-        <img src={octopImg} alt="" aria-hidden className={styles.octopBg} />
+        <img src={logoSvg} alt="" aria-hidden className={styles.octopBg} />
         <div className={styles.gradient} />
       </div>
 

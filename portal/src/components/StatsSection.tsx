@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLang } from "@/store/lang";
 import { createT } from "@/i18n";
-import styles from "./StatsSection.module.css";
+import styles from "./StatsSection.module.less";
 
 interface StatItem {
   valueKey: string;

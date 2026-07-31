@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useLang } from "@/store/lang";
 import { createT } from "@/i18n";
-import octopImg from "/octop.png";
-import styles from "./Navbar.module.css";
+import logoSvg from "/logo.svg";
+import styles from "./Navbar.module.less";
 
 export function Navbar() {
   const locale = useLang((s) => s.locale);
@@ -24,7 +24,7 @@ export function Navbar() {
     <nav className={`${styles.nav} ${scrolled ? styles.navScrolled : ""}`}>
       <div className={styles.inner}>
         <a href="/" className={styles.brand}>
-          <img src={octopImg} alt="Octop" className={styles.logo} />
+          <img src={logoSvg} alt="Octop" className={styles.logo} />
           <span className={styles.brandName}>Octop</span>
         </a>
 
