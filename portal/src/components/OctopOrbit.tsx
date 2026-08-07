@@ -43,14 +43,14 @@ export function OctopOrbit() {
       ctx.lineDashOffset = -angle * rx * (i + 1) * 0.6;
 
       const gradient = ctx.createLinearGradient(-rx, 0, rx, 0);
-      gradient.addColorStop(0, "rgba(0,212,255,0)");
-      gradient.addColorStop(0.5, `rgba(0,212,255,${0.5 - progress * 0.15})`);
-      gradient.addColorStop(1, "rgba(0,212,255,0)");
+      gradient.addColorStop(0, "rgba(59,130,246,0)");
+      gradient.addColorStop(0.5, `rgba(59,130,246,${0.5 - progress * 0.15})`);
+      gradient.addColorStop(1, "rgba(59,130,246,0)");
 
       ctx.strokeStyle = gradient;
       ctx.lineWidth = 1.5 - progress * 0.4;
-      ctx.shadowColor = "#00D4FF";
-      ctx.shadowBlur = 8;
+      ctx.shadowColor = "#3b82f6";
+      ctx.shadowBlur = 6;
       ctx.stroke();
 
       ctx.restore();
@@ -59,8 +59,8 @@ export function OctopOrbit() {
     // Glow pulse around center
     const pulseRadius = cx * 0.38 + Math.sin(angle * 2) * cx * 0.04;
     const radialGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, pulseRadius);
-    radialGrad.addColorStop(0, "rgba(255,107,74,0.08)");
-    radialGrad.addColorStop(0.6, "rgba(0,212,255,0.04)");
+    radialGrad.addColorStop(0, "rgba(59,130,246,0.06)");
+    radialGrad.addColorStop(0.6, "rgba(59,130,246,0.03)");
     radialGrad.addColorStop(1, "rgba(0,0,0,0)");
     ctx.beginPath();
     ctx.arc(cx, cy, pulseRadius, 0, Math.PI * 2);

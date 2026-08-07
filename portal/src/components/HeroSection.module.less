@@ -2,7 +2,7 @@
   position: relative;
   width: 100%;
   min-height: 100vh;
-  background: #0a0e1a;
+  background: #0f1117;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -15,8 +15,8 @@
   inset: 0;
   background: radial-gradient(
     ellipse 70% 60% at 50% 50%,
-    rgba(0, 212, 255, 0.04) 0%,
-    rgba(255, 107, 74, 0.03) 40%,
+    rgba(59, 130, 246, 0.05) 0%,
+    rgba(59, 130, 246, 0.02) 40%,
     transparent 70%
   );
   pointer-events: none;
@@ -46,10 +46,10 @@
 .badge {
   display: inline-block;
   padding: 6px 16px;
-  background: rgba(0, 212, 255, 0.1);
-  border: 1px solid rgba(0, 212, 255, 0.3);
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
   border-radius: 100px;
-  color: #00d4ff;
+  color: #60a5fa;
   font-size: 13px;
   letter-spacing: 0.06em;
   font-family: "SF Mono", "Fira Code", monospace;
@@ -72,7 +72,7 @@
 }
 
 .titleAccent {
-  background: linear-gradient(90deg, #ff6b4a 0%, #ffd700 50%, #00d4ff 100%);
+  background: linear-gradient(90deg, #60a5fa 0%, #93c5fd 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -80,7 +80,7 @@
 
 .subtitle {
   font-size: clamp(0.95rem, 1.5vw, 1.1rem);
-  color: #00d4ff;
+  color: #60a5fa;
   font-family: "SF Mono", "Fira Code", monospace;
   letter-spacing: 0.04em;
 }
@@ -103,19 +103,20 @@
   display: inline-flex;
   align-items: center;
   padding: 14px 32px;
-  background: linear-gradient(135deg, #ff6b4a 0%, #ff4d6d 100%);
+  background: #3b82f6;
   color: #fff;
   font-weight: 700;
   font-size: 1rem;
   border-radius: 12px;
   text-decoration: none;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  box-shadow: 0 4px 24px rgba(255, 107, 74, 0.35);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  box-shadow: 0 4px 24px rgba(59, 130, 246, 0.3);
 }
 
 .ctaPrimary:hover {
+  background: #2563eb;
   transform: translateY(-3px);
-  box-shadow: 0 8px 32px rgba(255, 107, 74, 0.5);
+  box-shadow: 0 8px 32px rgba(59, 130, 246, 0.45);
 }
 
 .ctaSecondary {
@@ -135,13 +136,13 @@
 }
 
 .ctaSecondary:hover {
-  background: rgba(255, 215, 0, 0.1);
-  border-color: rgba(255, 215, 0, 0.4);
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.35);
   transform: translateY(-3px);
 }
 
 .starIcon {
-  color: #ffd700;
+  color: #e2e8f0;
   font-size: 1.1rem;
 }
 
@@ -173,8 +174,7 @@
   object-fit: contain;
   /* Use the top-left "sitting at laptop" region of the sprite sheet */
   object-position: center 10%;
-  filter: drop-shadow(0 0 40px rgba(255, 107, 74, 0.35))
-          drop-shadow(0 0 80px rgba(0, 212, 255, 0.15));
+  filter: drop-shadow(0 0 32px rgba(59, 130, 246, 0.25));
   z-index: 1;
 }
 
@@ -199,7 +199,7 @@
 }
 
 .scrollHint:hover {
-  color: #00d4ff;
+  color: #60a5fa;
 }
 
 .scrollArrow {

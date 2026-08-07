@@ -8,7 +8,7 @@ const CHANNELS = [
   { name: "QQ", icon: "🐧", color: "#1DA1F2" },
   { name: "Discord", icon: "🎮", color: "#5865F2" },
   { name: "WeCom", icon: "💬", color: "#07C160" },
-  { name: "WebChat", icon: "🌐", color: "#00D4FF" },
+  { name: "WebChat", icon: "🌐", color: "#3b82f6" },
 ] as const;
 
 function OrbitCanvas({ count }: { count: number }) {

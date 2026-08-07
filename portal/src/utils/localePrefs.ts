@@ -47,9 +47,9 @@ export function storeUiLocale(locale: UiLocale): void {
   }
 }
 
-/** Stored user preference wins; otherwise follow the browser. */
+/** Stored user preference wins; otherwise default to Chinese. */
 export function resolveInitialLocale(): UiLocale {
-  return readStoredUiLocale() ?? detectBrowserLocale();
+  return readStoredUiLocale() ?? "zh";
 }
 
 export function syncDocumentLang(locale: UiLocale): void {

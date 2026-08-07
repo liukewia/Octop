@@ -11,7 +11,7 @@ interface Particle {
   alphaDir: number;
 }
 
-const COLORS = ["#00D4FF", "#FF6B4A", "#FFD700", "#ffffff"];
+const COLORS = ["#3b82f6", "#60a5fa", "#93c5fd", "#ffffff"];
 const PARTICLE_COUNT = 1400;
 const CONNECTION_DIST = 130;
 const REPULSE_DIST = 120;
@@ -126,7 +126,7 @@ export function ParticleCanvas() {
             ctx.beginPath();
             ctx.moveTo(a.x, a.y);
             ctx.lineTo(b.x, b.y);
-            ctx.strokeStyle = `rgba(0,212,255,${opacity})`;
+            ctx.strokeStyle = `rgba(59,130,246,${opacity})`;
             ctx.lineWidth = 0.6;
             ctx.stroke();
           }

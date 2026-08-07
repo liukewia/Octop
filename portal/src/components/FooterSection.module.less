@@ -1,9 +1,9 @@
 .footer {
   position: relative;
-  background: #070b14;
+  background: #0a0d14;
   padding: 100px 48px 60px;
   overflow: hidden;
-  border-top: 1px solid rgba(0, 212, 255, 0.08);
+  border-top: 1px solid rgba(59, 130, 246, 0.1);
 }
 
 .bgOctop {
@@ -21,9 +21,9 @@
   width: 100%;
   height: 100%;
   object-fit: contain;
-  opacity: 0.18;
+  opacity: 0.12;
   object-position: bottom right;
-  filter: blur(1px) saturate(0.6);
+  filter: blur(1px) saturate(0.4);
 }
 
 .gradient {
@@ -31,8 +31,8 @@
   inset: 0;
   background: linear-gradient(
     to right,
-    #070b14 30%,
-    rgba(7, 11, 20, 0.4) 70%,
+    #0a0d14 30%,
+    rgba(10, 13, 20, 0.4) 70%,
     transparent 100%
   );
 }
@@ -65,19 +65,20 @@
   align-items: center;
   gap: 8px;
   padding: 14px 32px;
-  background: linear-gradient(135deg, #ffd700 0%, #ff9f3f 100%);
-  color: #0a0e1a;
+  background: #3b82f6;
+  color: #fff;
   font-weight: 800;
   font-size: 1rem;
   border-radius: 12px;
   text-decoration: none;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  box-shadow: 0 4px 24px rgba(255, 215, 0, 0.3);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  box-shadow: 0 4px 24px rgba(59, 130, 246, 0.3);
 }
 
 .ctaPrimary:hover {
+  background: #2563eb;
   transform: translateY(-3px);
-  box-shadow: 0 8px 32px rgba(255, 215, 0, 0.45);
+  box-shadow: 0 8px 32px rgba(59, 130, 246, 0.45);
 }
 
 .star {
