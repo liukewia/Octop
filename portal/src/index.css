@@ -5,10 +5,12 @@
 
 @custom-variant dark (&:is(.dark *));
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
 }
 
 html {
@@ -117,6 +119,23 @@ body {
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* Landing page tokens (Figma: Octop / 头图方案二-2) */
+  --color-ink: rgb(0 0 0 / 90%);
+  --color-ink-secondary: rgb(0 0 0 / 70%);
+  --color-ink-muted: rgb(0 0 0 / 60%);
+  --color-ink-faint: rgb(0 0 0 / 40%);
+  --color-ink-ghost: rgb(0 0 0 / 30%);
+  --color-line-subtle: rgb(0 0 0 / 8%);
+  --color-line-strong: rgb(0 0 0 / 10%);
+  --color-brand: #ff4502;
+  --color-brand-strong: #ff0105;
+  --color-brand-soft: #fff1f1;
+  --color-brand-tint: #ffeded;
+  --color-surface-subtle: #f9f9f9;
+  --radius-landing-card: 16px;
+  --radius-landing-md: 12px;
+  --radius-landing-sm: 8px;
 }
 
 :root {
@@ -197,5 +216,11 @@ body {
   }
   html {
     @apply font-sans;
+  }
+}
+
+@layer components {
+  .page-container {
+    @apply mx-auto w-full max-w-[1440px] px-20 max-[1280px]:px-10 max-[600px]:px-5;
   }
 }

@@ -3,11 +3,11 @@ import { motion } from "framer-motion";
 import { Languages } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { changeLocale } from "@/i18n";
+import { cn } from "@/lib/utils";
 import { readStoredUiLocale, type UiLocale } from "@/utils/localePrefs";
 import logoWordmark from "@/assets/landing/logo-wordmark.svg";
 import { CHANGELOG_URL, DOCS_URL } from "@/constants/links";
 import { EASE_OUT } from "@/motion";
-import styles from "./Navbar.module.less";
 
 const NAV_LINKS = [
   { key: "overview", href: "#overview" },
@@ -33,28 +33,31 @@ export function Navbar() {
 
   return (
     <motion.nav
-      className={`${styles.nav} ${scrolled ? styles.navScrolled : ""}`}
+      className={cn(
+        "fixed inset-x-0 top-0 z-[100] border-b border-transparent transition-[background,backdrop-filter,border-color] duration-300 ease-out",
+        scrolled && "border-line-subtle bg-white/82 backdrop-blur-[16px]",
+      )}
       initial={{ y: -56, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.7, ease: EASE_OUT }}
     >
-      <div className={styles.inner}>
+      <div className="relative flex h-[50px] items-center justify-between gap-6 px-20 max-[1280px]:px-10 max-[600px]:px-5">
         <motion.a
           href="/"
-          className={styles.brand}
+          className="flex shrink-0 items-center no-underline"
           aria-label="Octop"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.2 }}
         >
-          <img src={logoWordmark} alt="Octop" className={styles.logo} />
+          <img src={logoWordmark} alt="Octop" className="h-[26px] w-[80.6px] object-contain" />
         </motion.a>
 
-        <div className={styles.links}>
+        <div className="absolute top-1/2 left-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-8 max-[900px]:hidden">
           {NAV_LINKS.map((link, index) => (
             <motion.a
               key={link.key}
-              className={styles.link}
+              className="text-ink-secondary text-sm leading-[22px] font-medium no-underline transition-colors duration-200 ease-out hover:text-ink"
               href={link.href}
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
@@ -69,12 +72,16 @@ export function Navbar() {
         </div>
 
         <motion.div
-          className={styles.actions}
+          className="flex items-center gap-3"
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.35, ease: EASE_OUT }}
         >
-          <button type="button" className={styles.langBtn} onClick={handleToggleLang}>
+          <button
+            type="button"
+            className="text-ink-secondary hover:text-ink inline-flex cursor-pointer items-center gap-1.5 border-none bg-transparent px-1 py-[7px] font-[inherit] text-sm leading-[22px] font-medium transition-colors duration-200 ease-out"
+            onClick={handleToggleLang}
+          >
             <Languages size={16} strokeWidth={1.8} />
             {t("nav.lang")}
           </button>

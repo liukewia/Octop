@@ -5,7 +5,7 @@ import { Navbar } from "@/components/Navbar";
 export function RootLayout() {
   return (
     <MotionConfig reducedMotion="user">
-      <div style={{ minHeight: "100vh", background: "#fff" }}>
+      <div className="min-h-screen bg-white">
         <Navbar />
         <Outlet />
       </div>
