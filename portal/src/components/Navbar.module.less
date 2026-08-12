@@ -1,0 +1,104 @@
+@import "../styles/tokens.less";
+
+.nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  transition:
+    background 0.3s ease,
+    backdrop-filter 0.3s ease,
+    border-color 0.3s ease;
+  border-bottom: 1px solid transparent;
+}
+
+.navScrolled {
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(16px);
+  border-bottom-color: @border-subtle;
+}
+
+.inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  height: 50px;
+  padding: 0 @page-pad;
+
+  @media (max-width: @bp-lg) {
+    padding: 0 @page-pad-md;
+  }
+
+  @media (max-width: @bp-sm) {
+    padding: 0 @page-pad-sm;
+  }
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  text-decoration: none;
+}
+
+.logo {
+  width: 80.6px;
+  height: 26px;
+  object-fit: contain;
+}
+
+.links {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  gap: 32px;
+
+  @media (max-width: @bp-md) {
+    display: none;
+  }
+}
+
+.link {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 22px;
+  color: @text-secondary;
+  text-decoration: none;
+  transition: color 0.2s ease;
+
+  &:hover {
+    color: @text-primary;
+  }
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.langBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 22px;
+  color: @text-secondary;
+  cursor: pointer;
+  padding: 7px 4px;
+  transition: color 0.2s ease;
+
+  &:hover {
+    color: @text-primary;
+  }
+}

@@ -1,0 +1,113 @@
+{
+  "nav": {
+    "overview": "Overview",
+    "changelog": "Changelog",
+    "docs": "Docs",
+    "lang": "中文"
+  },
+  "hero": {
+    "badge_prefix": "Starred ",
+    "badge_stars": "1k",
+    "badge_suffix": "+ times on GitHub",
+    "title_lead": "Understands you,",
+    "title_trail": "an AI partner that grows with you",
+    "subtitle": "More than a tool — a digital companion that works in parallel. Built for individuals and teams, it makes collaboration efficient, flexible and easy to extend.",
+    "cta_primary": "Get started",
+    "cta_secondary": "Read the docs",
+    "screenshot_alt": "Octop chat home screen"
+  },
+  "install": {
+    "title": "Three steps",
+    "desc": "No need to set up a complex environment first. Copy the command below and run it — Octop prepares everything it needs.",
+    "methods": {
+      "script": "One-line install",
+      "pip": "Install with pip",
+      "docker": "Install with Docker"
+    },
+    "platforms": {
+      "mac": "macOS / Linux",
+      "win_ps": "Windows (PowerShell)",
+      "win_cmd": "Windows (Command Prompt)"
+    },
+    "hints": {
+      "script": "Best for trying Octop out on your own machine.",
+      "pip": "Already have Python? Install straight from PyPI.",
+      "docker": "Best for servers — the container ships with its own runtime."
+    },
+    "copy": "Copy",
+    "copied": "Copied"
+  },
+  "why": {
+    "title_lead": "Why",
+    "desc": "It runs on your own machine, works for a whole team, and lets you switch assistants for different jobs.",
+    "items": {
+      "multi_user": {
+        "title": "One system, many assistants",
+        "desc": "A family or team shares a single deployment while everyone keeps their own assistant — and can switch to a better-suited expert for reports, research or code."
+      },
+      "connectors": {
+        "title": "Connects to the services you use",
+        "desc": "Hook it up to everyday tools such as Tencent Docs, and add more services whenever you need them."
+      },
+      "coding": {
+        "title": "Works alongside your coding tools",
+        "desc": "It cooperates with the AI in your editor and terminal, and hands complex work over to dedicated coding agents."
+      },
+      "computer": {
+        "title": "Knows its way around your computer",
+        "desc": "It runs terminal commands and troubleshoots for you, and can open pages, fill forms and take screenshots on its own."
+      },
+      "desktop_pet": {
+        "title": "A desktop companion, always nearby",
+        "desc": "The floating pet stays on your desktop and answers on demand — capture an idea the moment it appears, no browser required."
+      }
+    }
+  },
+  "pet": {
+    "placeholder": "Say something to Octop",
+    "agent": "Tong · General assistant",
+    "connector": "Connectors",
+    "auto": "Auto",
+    "notice": "AI-generated content — please review carefully"
+  },
+  "faq": {
+    "title": "Questions & help",
+    "desc": "Find answers about Octop and how everything works.",
+    "items": {
+      "open_source": {
+        "q": "Is Octop open source?",
+        "a": "Yes. Octop is fully open source under the MIT license, so you are free to use, modify and redistribute it."
+      },
+      "storage": {
+        "q": "Where is my data stored?",
+        "a": "Everything stays on your own machine, by default under ~/.octop. Chat history, workspace files and credentials are never uploaded to a third party."
+      },
+      "skills": {
+        "q": "How do I add new skills?",
+        "a": "Install a skill package from the Skills page in the dashboard, or drop a skill folder into the assistant workspace — it is loaded on the next start."
+      },
+      "multi_user": {
+        "q": "Does it support multiple users?",
+        "a": "Yes. A single deployment can host multiple users and roles, each with their own assistants, workspace and permissions."
+      },
+      "commercial": {
+        "q": "Is there a commercial or cloud edition?",
+        "a": "We currently offer two options: the open source edition, and a Tencent Cloud Lighthouse quick-create image."
+      },
+      "os": {
+        "q": "Which operating systems are supported?",
+        "a": "macOS, Linux and Windows — or any container-capable server via Docker."
+      }
+    }
+  },
+  "cta": {
+    "title": "Ready to start working with your own AI partner?",
+    "button": "Get started"
+  },
+  "footer": {
+    "channels": {
+      "github": "GitHub",
+      "wechat": "WeChat group"
+    }
+  }
+}

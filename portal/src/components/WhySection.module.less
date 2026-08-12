@@ -1,0 +1,213 @@
+@import "../styles/tokens.less";
+
+.section {
+  padding: 240px 0 0;
+
+  @media (max-width: @bp-md) {
+    padding-top: 120px;
+  }
+}
+
+.inner {
+  .page-container();
+  display: grid;
+  grid-template-columns: 465px minmax(0, 841px);
+  justify-content: space-between;
+  gap: 60px;
+
+  @media (max-width: @bp-lg) {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 48px;
+  }
+}
+
+.asideSticky {
+  position: sticky;
+  top: 120px;
+
+  @media (max-width: @bp-lg) {
+    position: static;
+  }
+}
+
+.heading {
+  display: inline-block;
+  font-size: 42px;
+  font-weight: 600;
+  line-height: 50px;
+  color: #000;
+
+  @media (max-width: @bp-sm) {
+    font-size: 32px;
+    line-height: 40px;
+  }
+}
+
+// Anchors the hand-drawn stroke to the brand word so it follows it across locales.
+.brand {
+  position: relative;
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.underline {
+  .section-underline();
+  left: 0;
+  top: calc(100% - 10px);
+  width: 100%;
+  height: 14px;
+}
+
+.desc {
+  margin-top: 28px;
+  font-size: 20px;
+  line-height: 28px;
+  color: @text-faint;
+
+  @media (max-width: @bp-sm) {
+    font-size: 16px;
+    line-height: 24px;
+  }
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 36px;
+  margin-top: 76px;
+  padding-left: 20px;
+  border-left: 3px solid transparent;
+
+  @media (max-width: @bp-lg) {
+    display: none;
+  }
+}
+
+.navItem {
+  position: relative;
+  max-width: 220px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 20px;
+  line-height: 28px;
+  color: @text-faint;
+  text-align: left;
+  cursor: pointer;
+  transition: color 0.2s ease;
+
+  &:hover {
+    color: @text-secondary;
+  }
+}
+
+.navMarker {
+  position: absolute;
+  left: -23px;
+  top: 0;
+  width: 3px;
+  height: 28px;
+  border-radius: 3px;
+  background: #000;
+}
+
+.navItemActive {
+  font-weight: 500;
+  color: #000;
+}
+
+.blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 120px;
+
+  @media (max-width: @bp-md) {
+    gap: 72px;
+  }
+}
+
+.block {
+  scroll-margin-top: 120px;
+}
+
+.blockHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 593px;
+}
+
+.blockTitle {
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 32px;
+  color: #000;
+}
+
+.blockDesc {
+  font-size: 18px;
+  line-height: 26px;
+  color: @text-faint;
+
+  @media (max-width: @bp-sm) {
+    font-size: 15px;
+    line-height: 24px;
+  }
+}
+
+.card {
+  position: relative;
+  overflow: hidden;
+  margin-top: 43px;
+  aspect-ratio: 841 / 593;
+  border-radius: @radius-card;
+  background: linear-gradient(
+    146deg,
+    rgb(255, 222, 222) 2.4%,
+    rgb(241, 240, 224) 79.8%,
+    rgb(255, 242, 221) 97.7%
+  );
+}
+
+.cardBg {
+  position: absolute;
+  inset: 0;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.cardTint {
+  position: absolute;
+  inset: 0;
+  background: @accent;
+  mix-blend-mode: soft-light;
+}
+
+.cardFade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, #fff 8.5%, rgba(255, 255, 255, 0) 99%);
+}
+
+.shot {
+  position: absolute;
+  left: 50px;
+  top: 50px;
+  width: calc(100% + 161px);
+  max-width: none;
+  height: auto;
+  border-radius: @radius-md;
+  box-shadow: 0 24px 50px rgba(221, 0, 0, 0.32);
+
+  @media (max-width: @bp-md) {
+    left: 24px;
+    top: 24px;
+    width: calc(100% + 80px);
+  }
+}
