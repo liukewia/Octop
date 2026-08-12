@@ -11,13 +11,11 @@ import { EASE_OUT, fadeUp, hoverLift, popIn, rise, staggerParent } from "@/motio
 
 type PetPlatform = "mac_arm" | "mac_intel" | "win_x64" | "win_arm";
 
-type Format = { ext: string; url: string };
-
 type PlatformSpec = {
   id: PetPlatform;
   icon: "apple" | "windows";
-  /** First entry drives the primary download button. */
-  formats: Format[];
+  ext: string;
+  url: string;
 };
 
 const PET_VERSION = "0.1.0";
@@ -29,28 +27,26 @@ const PLATFORMS: PlatformSpec[] = [
   {
     id: "mac_arm",
     icon: "apple",
-    formats: [{ ext: ".dmg", url: assetUrl("aarch64.dmg") }],
+    ext: ".dmg",
+    url: assetUrl("aarch64.dmg"),
   },
   {
     id: "mac_intel",
     icon: "apple",
-    formats: [{ ext: ".dmg", url: assetUrl("x64.dmg") }],
+    ext: ".dmg",
+    url: assetUrl("x64.dmg"),
   },
   {
     id: "win_x64",
     icon: "windows",
-    formats: [
-      { ext: ".msi", url: assetUrl("x64_en-US.msi") },
-      { ext: ".exe", url: assetUrl("x64-setup.exe") },
-    ],
+    ext: ".exe",
+    url: assetUrl("x64-setup.exe"),
   },
   {
     id: "win_arm",
     icon: "windows",
-    formats: [
-      { ext: ".msi", url: assetUrl("arm64_en-US.msi") },
-      { ext: ".exe", url: assetUrl("arm64-setup.exe") },
-    ],
+    ext: ".exe",
+    url: assetUrl("arm64-setup.exe"),
   },
 ];
 
@@ -102,7 +98,7 @@ export function PetSection() {
   }, [menuOpen]);
 
   const primary = PLATFORMS.find((platform) => platform.id === detected);
-  const primaryUrl = primary?.formats[0]?.url ?? OCTOP_PET_RELEASES_URL;
+  const primaryUrl = primary?.url ?? OCTOP_PET_RELEASES_URL;
   const primaryLabel = primary
     ? t("pet.download_for", { platform: t(`pet.platforms.${primary.id}.label`) })
     : t("pet.download");
@@ -185,12 +181,11 @@ export function PetSection() {
                     transition={{ duration: 0.2, ease: EASE_OUT }}
                   >
                     {PLATFORMS.map((platform) => (
-                      <div
+                      <a
                         key={platform.id}
-                        className={cn(
-                          "flex items-center gap-3 px-4 py-3",
-                          platform.id === detected && "bg-surface-subtle",
-                        )}
+                        role="menuitem"
+                        href={platform.url}
+                        className="hover:bg-surface-subtle flex items-center gap-3 px-4 py-3 no-underline transition-colors duration-200 ease-out"
                       >
                         <span
                           className="text-ink flex size-8 shrink-0 items-center justify-center rounded-landing-sm bg-[#f2f2f2]"
@@ -206,19 +201,10 @@ export function PetSection() {
                             {t(`pet.platforms.${platform.id}.meta`)}
                           </p>
                         </div>
-                        <div className="flex shrink-0 items-center gap-2">
-                          {platform.formats.map((format) => (
-                            <a
-                              key={format.ext}
-                              role="menuitem"
-                              className="border-line-subtle text-ink-secondary hover:border-line-strong hover:text-ink rounded border px-2 py-1 text-xs leading-[18px] no-underline transition-colors duration-200 ease-out"
-                              href={format.url}
-                            >
-                              {format.ext}
-                            </a>
-                          ))}
-                        </div>
-                      </div>
+                        <span className="text-ink-faint shrink-0 text-xs leading-[18px]">
+                          {platform.ext}
+                        </span>
+                      </a>
                     ))}
 
                     <a

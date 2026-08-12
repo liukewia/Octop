@@ -65,7 +65,7 @@
   },
   "pet": {
     "title": "A desktop companion, always nearby",
-    "desc": "The floating pet stays on your desktop and answers on demand — capture an idea the moment it appears, no browser required. The download button matches your OS and architecture automatically.",
+    "desc": "The floating pet stays on your desktop and answers on demand — capture an idea the moment it appears, no browser required.",
     "download": "Download the pet",
     "download_for": "Download the pet ({{platform}})",
     "all_platforms": "Other platforms",
