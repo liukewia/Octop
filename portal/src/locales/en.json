@@ -14,7 +14,20 @@
     "subtitle": "More than a tool — a digital companion that works in parallel. Built for individuals and teams, it makes collaboration efficient, flexible and easy to extend.",
     "cta_primary": "Get started",
     "cta_secondary": "Read the docs",
-    "screenshot_alt": "Octop chat home screen"
+    "screenshot_alt": "Octop chat home screen",
+    "float": {
+      "assistants_title": "Switch to a better expert",
+      "assistant_ops": "Ops Engineer",
+      "assistant_news": "News Reporter",
+      "assistant_parenting": "Parenting Helper",
+      "computer_title": "Computer use",
+      "computer_step_terminal": "Ran terminal command",
+      "computer_step_browser": "Opened page & filled form",
+      "computer_step_shot": "Took a screenshot",
+      "local_title": "Nothing leaves home",
+      "local_desc": "Chats, files and keys stay on your own machine",
+      "local_badge": "Self-hosted · MIT"
+    }
   },
   "install": {
     "title": "Three steps",
@@ -66,8 +79,8 @@
   "pet": {
     "title": "A desktop companion, always nearby",
     "desc": "The floating pet stays on your desktop and answers on demand — capture an idea the moment it appears, no browser required.",
-    "download": "Download the pet",
-    "download_for": "Download the pet ({{platform}})",
+    "download": "Download OctopPet",
+    "download_for": "Download OctopPet ({{platform}})",
     "all_platforms": "Other platforms",
     "all_releases": "All releases and past installers",
     "platforms": {

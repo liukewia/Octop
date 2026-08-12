@@ -37,11 +37,11 @@ export function Navbar() {
         "fixed inset-x-0 top-0 z-[100] border-b border-transparent transition-[background,backdrop-filter,border-color] duration-300 ease-out",
         scrolled && "border-line-subtle bg-white/82 backdrop-blur-[16px]",
       )}
-      initial={{ y: -56, opacity: 0 }}
+      initial={{ y: -64, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.7, ease: EASE_OUT }}
     >
-      <div className="relative flex h-[50px] items-center justify-between gap-6 px-20 max-[1280px]:px-10 max-[600px]:px-5">
+      <div className="relative flex h-16 items-center justify-between gap-6 px-20 max-[1280px]:px-10 max-[600px]:px-5">
         <motion.a
           href="/"
           className="flex shrink-0 items-center no-underline"

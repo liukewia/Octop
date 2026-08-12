@@ -1,7 +1,7 @@
-import { useState, useRef } from "react";
+import { useLayoutEffect, useState, useRef } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { useTranslation } from "react-i18next";
-import { ArrowRight, Github, Globe, MousePointer2 } from "lucide-react";
+import { ArrowRight, Bot, Check, Github, MousePointer2, ShieldCheck, Terminal } from "lucide-react";
 import heroBgMp4 from "@/assets/landing/hero-bg.mp4";
 import heroBgWebp from "@/assets/landing/hero-bg.webp";
 import heroChat from "@/assets/landing/hero-chat.webp";
@@ -10,28 +10,113 @@ import { DOCS_URL, GITHUB_URL } from "@/constants/links";
 import { cn } from "@/lib/utils";
 import { EASE_OUT, hoverArrow, hoverLift, rise, staggerOnMount } from "@/motion";
 
-const CONNECTIVITY_CARDS = [
-  {
-    iconSize: 27,
-    card: "left-[26px] top-0 w-[211px] gap-[18px] rounded-[13px] p-[9px] opacity-40 [filter:drop-shadow(0_4px_18px_rgba(0,0,0,0.06))]",
-    icon: "size-[42px] rounded-[9px]",
-    text: "text-[9px] leading-[18px]",
-  },
-  {
-    iconSize: 29,
-    card: "top-[11px] left-[15px] w-[233px] gap-5 rounded-[15px] p-2.5 opacity-80 [filter:drop-shadow(0_5px_20px_rgba(0,0,0,0.06))]",
-    icon: "size-[47px] rounded-[10px]",
-    text: "text-[10px] leading-5",
-  },
-  {
-    iconSize: 33,
-    card: "top-[22px] left-0 w-[264px] gap-2 rounded-[17px] p-[11px] [filter:drop-shadow(0_6px_22px_rgba(255,0,0,0.08))]",
-    icon: "size-[53px] rounded-[11px]",
-    text: "text-[17px] leading-7 font-semibold",
-  },
-] as const;
+/** Real experts from Octop's bundled catalog; the first one matches the agent in the screenshot. */
+const ASSISTANTS = ["ops", "news", "parenting"] as const;
+
+const COMPUTER_STEPS = ["terminal", "browser", "shot"] as const;
 
 const FLOAT_IN = { duration: 0.8, delay: 0.7, ease: EASE_OUT };
+
+/** Design width the floating cards are positioned against; they scale down with the screenshot. */
+const FLOAT_FRAME_WIDTH = 1148;
+
+function AssistantsCard() {
+  const { t } = useTranslation();
+
+  return (
+    <div className="flex flex-col gap-2 rounded-[16px] bg-white p-3.5 text-left [filter:drop-shadow(0_6px_22px_rgba(255,0,0,0.08))]">
+      <p className="text-ink-ghost text-[11px] leading-4 font-medium">
+        {t("hero.float.assistants_title")}
+      </p>
+      <div className="flex flex-col gap-1.5">
+        {ASSISTANTS.map((id, index) => {
+          const active = index === 0;
+          return (
+            <div
+              key={id}
+              className={cn(
+                "flex items-center gap-2.5 rounded-[10px] px-2 py-1.5",
+                active && "bg-brand-soft",
+              )}
+            >
+              <span
+                className={cn(
+                  "flex size-7 shrink-0 items-center justify-center rounded-[8px]",
+                  active ? "bg-brand-strong text-white" : "text-ink-secondary bg-[#f2f2f2]",
+                )}
+              >
+                <Bot size={16} strokeWidth={1.8} />
+              </span>
+              <span
+                className={cn(
+                  "flex-1 truncate text-[12px] leading-4 font-medium",
+                  active ? "text-ink" : "text-ink-secondary",
+                )}
+              >
+                {t(`hero.float.assistant_${id}`)}
+              </span>
+              {active ? <Check size={14} className="text-brand-strong shrink-0" /> : null}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ComputerCard() {
+  const { t } = useTranslation();
+
+  return (
+    <div className="relative rounded-[16px] bg-white text-left [filter:drop-shadow(0_6px_24px_rgba(255,0,0,0.08))]">
+      <div className="border-line-subtle flex items-center gap-2 border-b px-3.5 py-2.5">
+        <span className="bg-brand-soft text-brand-strong flex size-6 items-center justify-center rounded-[7px]">
+          <Terminal size={13} strokeWidth={2} />
+        </span>
+        <span className="text-ink text-[12px] leading-4 font-semibold">
+          {t("hero.float.computer_title")}
+        </span>
+      </div>
+      <div className="flex flex-col gap-1.5 px-3.5 py-3">
+        {COMPUTER_STEPS.map((id) => (
+          <div key={id} className="flex items-center gap-2">
+            <span className="bg-brand-strong flex size-3.5 shrink-0 items-center justify-center rounded-full text-white">
+              <Check size={9} strokeWidth={3} />
+            </span>
+            <span className="text-ink-secondary text-[11px] leading-4">
+              {t(`hero.float.computer_step_${id}`)}
+            </span>
+          </div>
+        ))}
+      </div>
+      <MousePointer2
+        size={34}
+        className="fill-brand-strong absolute -right-2 -bottom-3 text-white"
+      />
+    </div>
+  );
+}
+
+function LocalCard() {
+  const { t } = useTranslation();
+
+  return (
+    <div className="flex flex-col gap-2 rounded-[16px] bg-white p-3.5 text-left shadow-[0_5px_19px_rgba(255,0,0,0.08)]">
+      <div className="flex items-center gap-2.5">
+        <span className="bg-brand-soft text-brand-strong flex size-8 shrink-0 items-center justify-center rounded-[9px]">
+          <ShieldCheck size={18} strokeWidth={1.8} />
+        </span>
+        <span className="text-ink text-[13px] leading-[18px] font-semibold">
+          {t("hero.float.local_title")}
+        </span>
+      </div>
+      <p className="text-ink-secondary text-[11px] leading-4">{t("hero.float.local_desc")}</p>
+      <span className="bg-brand-tint text-brand-strong w-fit rounded-[6px] px-2 py-0.5 text-[10px] leading-4 font-medium">
+        {t("hero.float.local_badge")}
+      </span>
+    </div>
+  );
+}
 
 export function HeroSection() {
   const { t } = useTranslation();
@@ -42,9 +127,24 @@ export function HeroSection() {
     offset: ["start start", "end start"],
   });
 
-  const connectivityY = useTransform(scrollYProgress, [0, 1], [0, -110]);
-  const metricsY = useTransform(scrollYProgress, [0, 1], [0, 90]);
-  const scriptY = useTransform(scrollYProgress, [0, 1], [0, -70]);
+  const assistantsY = useTransform(scrollYProgress, [0, 1], [0, -110]);
+  const computerY = useTransform(scrollYProgress, [0, 1], [0, 90]);
+  const localY = useTransform(scrollYProgress, [0, 1], [0, -70]);
+
+  const frameRef = useRef<HTMLDivElement>(null);
+  const [floatScale, setFloatScale] = useState(1);
+
+  useLayoutEffect(() => {
+    const frame = frameRef.current;
+    if (!frame) return;
+    // Measure synchronously first so the cards never paint at the unscaled size.
+    const measure = () =>
+      setFloatScale(Math.min(1, frame.getBoundingClientRect().width / FLOAT_FRAME_WIDTH));
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(frame);
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <section
@@ -53,11 +153,7 @@ export function HeroSection() {
       ref={heroRef}
     >
       <div className="absolute inset-0 z-0" aria-hidden="true">
-        <img
-          src={heroBgWebp}
-          alt=""
-          className="block size-full object-cover object-top"
-        />
+        <img src={heroBgWebp} alt="" className="block size-full object-cover object-top" />
         <motion.video
           className="absolute inset-0 block size-full object-cover object-top pointer-events-none"
           src={heroBgMp4}
@@ -139,6 +235,7 @@ export function HeroSection() {
         <motion.div
           className="relative mx-auto mt-[100px] w-[min(1148px,100%)] perspective-[1400px] max-[900px]:mt-14"
           variants={rise}
+          ref={frameRef}
         >
           <motion.img
             src={heroChat}
@@ -149,100 +246,41 @@ export function HeroSection() {
             transition={{ duration: 1.1, delay: 0.45, ease: EASE_OUT }}
           />
 
-          <motion.div
-            className="absolute top-[259px] left-[-136px] h-[97px] w-[264px] max-[1280px]:hidden"
+          <div
+            className="pointer-events-none absolute top-0 left-0 h-0 w-[1148px] origin-top-left max-[768px]:hidden"
+            style={{ transform: `scale(${floatScale})` }}
             aria-hidden="true"
-            style={{ y: connectivityY }}
-            initial={{ opacity: 0, x: -32 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={FLOAT_IN}
           >
-            {CONNECTIVITY_CARDS.map((card, index) => (
-              <div
-                key={card.iconSize}
-                className={cn("absolute flex items-center bg-white", card.card)}
-              >
-                <span
-                  className={cn(
-                    "bg-brand-soft text-brand-strong flex shrink-0 items-center justify-center",
-                    card.icon,
-                  )}
-                >
-                  <Globe size={card.iconSize} strokeWidth={1.6} />
-                </span>
-                <div
-                  className={cn(
-                    "flex flex-col items-start text-left font-semibold break-words",
-                    card.text,
-                  )}
-                >
-                  <p className="text-ink">Connectivity Test</p>
-                  {index < 2 ? <p className="text-ink-ghost">Routing Connectivity Tests</p> : null}
-                </div>
-              </div>
-            ))}
-          </motion.div>
+            <motion.div
+              className="absolute top-[236px] left-0 w-[248px] min-[1281px]:left-[-24px]"
+              style={{ y: assistantsY }}
+              initial={{ opacity: 0, x: -32 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={FLOAT_IN}
+            >
+              <AssistantsCard />
+            </motion.div>
 
-          <motion.div
-            className="absolute top-[-29px] left-[958px] h-[107px] w-[274px] max-[1280px]:hidden"
-            aria-hidden="true"
-            style={{ y: metricsY }}
-            initial={{ opacity: 0, x: 32 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={FLOAT_IN}
-          >
-            <div className="absolute top-0 left-0 flex h-[68px] w-[190px] flex-col gap-[5px] rounded-2xl bg-white px-[22px] py-4 opacity-60 [filter:drop-shadow(0_6px_24px_rgba(0,0,0,0.06))]">
-              <div className="text-ink flex items-start justify-between text-sm leading-[25px] font-medium whitespace-nowrap">
-                <span>Disk</span>
-                <span>20%</span>
-              </div>
-              <div className="bg-brand-tint relative h-[3px] rounded-[64px]">
-                <motion.div
-                  className="bg-brand-strong absolute top-0 left-0 h-[3px] rounded-[64px]"
-                  initial={{ width: 0 }}
-                  animate={{ width: "24%" }}
-                  transition={{ duration: 1.2, delay: 1.1, ease: EASE_OUT }}
-                />
-              </div>
-            </div>
-            <div className="absolute top-9 left-[42px] flex h-[68px] w-[232px] flex-col gap-[5px] rounded-2xl bg-white px-[22px] py-4 opacity-100 [filter:drop-shadow(0_6px_24px_rgba(255,0,0,0.08))]">
-              <div className="text-ink flex items-start justify-between text-sm leading-[25px] font-medium whitespace-nowrap">
-                <span>Memory</span>
-                <span>48%</span>
-              </div>
-              <div className="bg-brand-tint relative h-[3px] rounded-[64px]">
-                <motion.div
-                  className="bg-brand-strong absolute top-0 left-0 h-[3px] rounded-[64px]"
-                  initial={{ width: 0 }}
-                  animate={{ width: "41%" }}
-                  transition={{ duration: 1.2, delay: 1.25, ease: EASE_OUT }}
-                />
-              </div>
-            </div>
-            <MousePointer2
-              size={34}
-              className="fill-brand-strong absolute top-[86px] left-[214px] text-white"
-            />
-          </motion.div>
+            <motion.div
+              className="absolute top-[-40px] left-[854px] w-[286px] min-[1281px]:left-[878px]"
+              style={{ y: computerY }}
+              initial={{ opacity: 0, x: 32 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={FLOAT_IN}
+            >
+              <ComputerCard />
+            </motion.div>
 
-          <motion.div
-            className="absolute top-[348px] left-[1052px] w-[257px] rounded-[10px] bg-white pb-3 text-left shadow-[0_5px_19px_rgba(255,0,0,0.08)] max-[1280px]:hidden"
-            aria-hidden="true"
-            style={{ y: scriptY }}
-            initial={{ opacity: 0, x: 32 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ ...FLOAT_IN, delay: 0.82 }}
-          >
-            <div className="flex h-8 items-center justify-end border-b border-line-subtle px-[19px]">
-              <span className="bg-brand-tint text-brand-strong inline-flex h-3.5 w-9 items-center justify-center rounded-[36px] font-mono text-[8px]">
-                .sh
-              </span>
-            </div>
-            <pre className="mt-2.5 mb-0 px-[19px] font-mono text-xs leading-[21px] text-[#92969d]">
-              <span className="text-[#565c65]">#!/bin/bash</span>
-              {"\n"}check_disk &amp;&amp; check_cpu{"\n"}report_status --json
-            </pre>
-          </motion.div>
+            <motion.div
+              className="absolute top-[360px] left-[912px] w-[236px] min-[1281px]:left-[936px]"
+              style={{ y: localY }}
+              initial={{ opacity: 0, x: 32 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ ...FLOAT_IN, delay: 0.82 }}
+            >
+              <LocalCard />
+            </motion.div>
+          </div>
         </motion.div>
       </motion.div>
     </section>

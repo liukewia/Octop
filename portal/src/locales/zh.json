@@ -14,7 +14,20 @@
     "subtitle": "不仅仅是工具，更是可并行运作的数字生命体。能够为个人和团队打造，提供高效、灵活、可扩展的智能协作体验。",
     "cta_primary": "快速开始",
     "cta_secondary": "阅读文档",
-    "screenshot_alt": "Octop 聊天首页界面"
+    "screenshot_alt": "Octop 聊天首页界面",
+    "float": {
+      "assistants_title": "换个专家来干活",
+      "assistant_ops": "运维工程师",
+      "assistant_news": "热点记者",
+      "assistant_parenting": "育儿管家",
+      "computer_title": "操控电脑",
+      "computer_step_terminal": "执行终端命令",
+      "computer_step_browser": "打开网页并填写表单",
+      "computer_step_shot": "自动截图",
+      "local_title": "数据不出门",
+      "local_desc": "聊天、文件和密钥都待在自己家里",
+      "local_badge": "自托管 · MIT 开源"
+    }
   },
   "install": {
     "title": "三步上手",
@@ -66,8 +79,8 @@
   "pet": {
     "title": "桌面伴侣随时在旁",
     "desc": "悬浮桌宠常驻桌面，随叫随到；一个念头冒出来，抬手就问，灵感不必等打开浏览器。",
-    "download": "下载桌宠",
-    "download_for": "下载桌宠（{{platform}}）",
+    "download": "下载 OctopPet",
+    "download_for": "下载 OctopPet（{{platform}}）",
     "all_platforms": "其他平台",
     "all_releases": "查看全部版本与历史安装包",
     "platforms": {

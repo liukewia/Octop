@@ -18,7 +18,7 @@ html {
 }
 
 section[id] {
-  scroll-margin-top: 72px;
+  scroll-margin-top: 80px;
 }
 
 /* Framer Motion handles its own reduced-motion opt-out; this covers the CSS keyframes. */

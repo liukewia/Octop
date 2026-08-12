@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useTranslation } from "react-i18next";
-import { Apple, ChevronDown, Download, Monitor } from "lucide-react";
+import { ChevronDown, Download, Monitor } from "lucide-react";
+import appleIcon from "@/assets/landing/apple.svg";
 import featureDesktopPet from "@/assets/landing/feature-desktop-pet.png";
 import octopusPet from "@/assets/landing/octopus-pet.webp";
 import underlineInstall from "@/assets/landing/underline-install.svg";
@@ -191,7 +192,11 @@ export function PetSection() {
                           className="text-ink flex size-8 shrink-0 items-center justify-center rounded-landing-sm bg-[#f2f2f2]"
                           aria-hidden="true"
                         >
-                          {platform.icon === "apple" ? <Apple size={16} /> : <Monitor size={16} />}
+                          {platform.icon === "apple" ? (
+                            <img src={appleIcon} alt="" className="size-4" />
+                          ) : (
+                            <Monitor size={16} />
+                          )}
                         </span>
                         <div className="min-w-0 flex-1">
                           <p className="text-ink text-sm leading-[22px] font-medium">
