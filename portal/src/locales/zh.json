@@ -64,11 +64,30 @@
     }
   },
   "pet": {
-    "placeholder": "和 Octop 说点什么",
-    "agent": "小通·通用助手",
-    "connector": "连接器",
-    "auto": "自动",
-    "notice": "AI 生成内容，请注意甄别"
+    "title": "桌面伴侣随时在旁",
+    "desc": "悬浮桌宠常驻桌面，随叫随到；一个念头冒出来，抬手就问，灵感不必等打开浏览器。下载按钮会自动匹配你的系统架构。",
+    "download": "下载桌宠",
+    "download_for": "下载桌宠（{{platform}}）",
+    "all_platforms": "其他平台",
+    "all_releases": "查看全部版本与历史安装包",
+    "platforms": {
+      "mac_arm": {
+        "label": "macOS Apple Silicon",
+        "meta": "M系列芯片"
+      },
+      "mac_intel": {
+        "label": "macOS Intel",
+        "meta": "Intel 芯片电脑"
+      },
+      "win_x64": {
+        "label": "Windows x64",
+        "meta": "大多数 64 位电脑"
+      },
+      "win_arm": {
+        "label": "Windows ARM64",
+        "meta": "Surface 等 ARM 设备"
+      }
+    }
   },
   "faq": {
     "title": "常问问题与帮助",

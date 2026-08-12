@@ -64,11 +64,30 @@
     }
   },
   "pet": {
-    "placeholder": "Say something to Octop",
-    "agent": "Tong · General assistant",
-    "connector": "Connectors",
-    "auto": "Auto",
-    "notice": "AI-generated content — please review carefully"
+    "title": "A desktop companion, always nearby",
+    "desc": "The floating pet stays on your desktop and answers on demand — capture an idea the moment it appears, no browser required. The download button matches your OS and architecture automatically.",
+    "download": "Download the pet",
+    "download_for": "Download the pet ({{platform}})",
+    "all_platforms": "Other platforms",
+    "all_releases": "All releases and past installers",
+    "platforms": {
+      "mac_arm": {
+        "label": "macOS Apple Silicon",
+        "meta": "M1 / M2 / M3 and later"
+      },
+      "mac_intel": {
+        "label": "macOS Intel",
+        "meta": "Intel Macs"
+      },
+      "win_x64": {
+        "label": "Windows x64",
+        "meta": "Most 64-bit PCs"
+      },
+      "win_arm": {
+        "label": "Windows ARM64",
+        "meta": "ARM devices like Surface"
+      }
+    }
   },
   "faq": {
     "title": "Questions & help",
