@@ -30,7 +30,7 @@
     }
   },
   "install": {
-    "title": "Three steps",
+    "title": "Ready in three steps",
     "desc": "No need to set up a complex environment first. Copy the command below and run it — Octop prepares everything it needs.",
     "methods": {
       "script": "One-line install",
@@ -78,6 +78,9 @@
   },
   "pet": {
     "title": "A desktop companion, always nearby",
+    "title_before": "A ",
+    "title_mark": "desktop companion",
+    "title_rest": ", always nearby",
     "desc": "The floating pet stays on your desktop and answers on demand — capture an idea the moment it appears, no browser required.",
     "download": "Download OctopPet",
     "download_for": "Download OctopPet ({{platform}})",

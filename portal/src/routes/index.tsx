@@ -16,5 +16,10 @@ export const router = createBrowserRouter(
     // Catch-all redirect
     { path: "*", element: <Navigate to="/" replace /> },
   ],
-  { basename: "/Octop" },
+{
+    basename: "/Octop",
+    future: {
+      v7_startTransition: true,
+    },
+  },
 );

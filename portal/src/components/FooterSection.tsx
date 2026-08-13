@@ -46,7 +46,7 @@ export function FooterSection() {
                 onMouseLeave={() => setOpenKey(null)}
               >
                 <a
-                  className="text-ink-secondary hover:text-ink hover:border-line-strong group inline-flex size-[38px] items-center justify-center rounded-full border border-line-subtle bg-white transition-[color,border-color,opacity] duration-200 ease-out"
+                  className="text-ink-secondary hover:text-ink group inline-flex size-[38px] items-center justify-center rounded-full bg-white transition-[color,opacity] duration-200 ease-out"
                   aria-label={label}
                   {...(href && {
                     href: href,

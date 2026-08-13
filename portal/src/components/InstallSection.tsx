@@ -2,7 +2,8 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useTranslation } from "react-i18next";
 import { Check, Copy } from "lucide-react";
-import octopusAvatar from "@/assets/landing/octopus-avatar.webp";
+import installBg from "@/assets/landing/hero-bg.webp";
+import octopHi from "@/assets/landing/octop-hi.png";
 import octopusType from "@/assets/landing/octopus-type.png";
 import underlineInstall from "@/assets/landing/underline-install.svg";
 import { cn } from "@/lib/utils";
@@ -81,23 +82,20 @@ export function InstallSection() {
   return (
     <section className="pt-[200px] max-[900px]:pt-24" id="install">
       <div className="page-container grid grid-cols-[465px_minmax(0,859px)] justify-between gap-[60px] max-[1280px]:grid-cols-[minmax(0,1fr)] max-[1280px]:gap-10">
-        <motion.div
-          className="relative pb-[310px] max-[1280px]:pb-0"
-          {...staggerParent(0.12)}
-        >
+        <motion.div className="relative pb-[310px] max-[1280px]:pb-0" {...staggerParent(0.12)}>
           <motion.h2
-            className="relative inline-block text-[42px] leading-[50px] font-semibold text-black max-[600px]:text-[32px] max-[600px]:leading-10"
+            className="relative z-0 inline-block text-[36px] leading-[44px] font-semibold text-black max-[600px]:text-[28px] max-[600px]:leading-9"
             variants={rise}
           >
             {t("install.title")}
             <img
               src={underlineInstall}
               alt=""
-              className="pointer-events-none absolute top-10 left-[-1px] h-3.5 w-[170px] select-none"
+              className="pointer-events-none absolute top-10 left-[-1px] -z-10 h-3.5 w-[calc(100%+8px)] select-none"
             />
           </motion.h2>
           <motion.p
-            className="text-ink-muted mt-8 text-xl leading-7 max-[600px]:text-base max-[600px]:leading-6"
+            className="text-ink-muted mt-8 text-lg leading-[26px] max-[600px]:text-[15px] max-[600px]:leading-6"
             variants={rise}
           >
             {t("install.desc")}
@@ -105,7 +103,7 @@ export function InstallSection() {
           <motion.img
             src={octopusType}
             alt=""
-            className="absolute left-[-8px] h-auto w-[310px] max-[1280px]:static max-[1280px]:mt-6 max-[1280px]:block max-[1280px]:w-[220px]"
+            className="absolute bottom-0 left-[-8px] h-auto w-[310px] max-[1280px]:static max-[1280px]:mt-6 max-[1280px]:block max-[1280px]:w-[220px]"
             variants={popIn}
           />
         </motion.div>
@@ -114,7 +112,10 @@ export function InstallSection() {
           className="overflow-hidden rounded-landing-md border border-line-subtle bg-surface-subtle"
           {...fadeUp(0.1, 36)}
         >
-          <div className="flex h-11 items-center gap-[26px] bg-[#f2f2f2] px-4" role="tablist">
+          <div
+            className="flex h-14 items-stretch gap-8 bg-white px-8 max-[600px]:h-12 max-[600px]:gap-4 max-[600px]:px-4"
+            role="tablist"
+          >
             {METHODS.map((item) => (
               <button
                 key={item}
@@ -122,8 +123,8 @@ export function InstallSection() {
                 role="tab"
                 aria-selected={method === item}
                 className={cn(
-                  "text-ink-secondary relative cursor-pointer border-none bg-transparent p-0 font-[inherit] text-sm transition-colors duration-200 ease-out hover:text-ink",
-                  method === item && "text-ink font-medium",
+                  "text-ink-secondary relative inline-flex cursor-pointer items-center border-none bg-transparent p-0 font-[inherit] text-[15px] leading-6 transition-colors duration-200 ease-out hover:text-ink max-[600px]:text-[13px]",
+                  method === item && "text-ink font-semibold",
                 )}
                 onClick={() => setMethod(item)}
               >
@@ -131,7 +132,7 @@ export function InstallSection() {
                 {method === item ? (
                   <motion.span
                     layoutId="installTabUnderline"
-                    className="absolute inset-x-0 bottom-[-13px] h-0.5 rounded-sm bg-ink"
+                    className="absolute inset-x-0 bottom-0 h-[3px] rounded-t-sm bg-ink"
                     transition={{ duration: 0.35, ease: EASE_OUT }}
                   />
                 ) : null}
@@ -139,42 +140,66 @@ export function InstallSection() {
             ))}
           </div>
 
-          <div className="flex items-start gap-3 p-4">
-            <span className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full border-[0.75px] border-[#ffe3e3] bg-[#ffebeb] max-[600px]:hidden">
-              <img
-                src={octopusAvatar}
-                alt=""
-                className="size-8 object-contain object-bottom"
-              />
-            </span>
+          <div className="relative flex items-start gap-3 px-[60px] py-14 max-[900px]:px-8 max-[900px]:py-10 max-[600px]:gap-2 max-[600px]:px-4 max-[600px]:py-6">
+            <div className="pointer-events-none absolute inset-0 select-none" aria-hidden="true">
+              <img src={installBg} alt="" className="size-full object-cover object-bottom" />
+              {/* Fade the gradient out toward the top-left so the orange stays a corner accent. */}
+              <span className="absolute inset-0 bg-[linear-gradient(to_bottom_right,#fff_18%,rgb(255_255_255_/_72%)_46%,rgb(255_255_255_/_0%)_88%)]" />
+            </div>
 
-            <div className="flex min-w-0 flex-1 flex-col items-center gap-8 rounded-landing-sm bg-white px-5 py-12 max-[600px]:gap-5 max-[600px]:px-3 max-[600px]:py-6">
-              {method === "script" ? (
-                <div className="flex h-8 items-center justify-center rounded-landing-sm bg-[#eee] p-[3px] max-[600px]:h-auto max-[600px]:flex-wrap">
-                  {PLATFORMS.map((item) => (
-                    <button
-                      key={item}
-                      type="button"
-                      className={cn(
-                        "text-ink relative inline-flex h-[26px] cursor-pointer items-center justify-center rounded border-none bg-transparent px-4 py-[5px] font-[inherit] text-xs leading-5 whitespace-nowrap",
-                        platform === item && "font-medium",
-                      )}
-                      onClick={() => setPlatform(item)}
+            <img
+              src={octopHi}
+              alt=""
+              className="relative size-9 shrink-0 rounded-full object-contain max-[600px]:hidden"
+            />
+
+            <div className="relative flex min-w-0 flex-1 flex-col items-center rounded-landing-card bg-white px-12 py-12 shadow-[0_12px_40px_rgba(0,0,0,0.06)] max-[900px]:px-8 max-[600px]:px-4 max-[600px]:py-6">
+              {/* The platform row plus its gap is always reserved, so switching tabs never resizes the
+                  card; without the row the space is split above and below to keep content centered. */}
+              <div
+                className={cn(
+                  "flex w-full items-start overflow-hidden transition-[height] duration-300 ease-out",
+                  method === "script"
+                    ? "h-[72px] max-[600px]:h-auto max-[600px]:min-h-[60px] max-[600px]:pb-5"
+                    : "h-9 max-[600px]:h-[30px]",
+                )}
+              >
+                <AnimatePresence initial={false}>
+                  {method === "script" ? (
+                    <motion.div
+                      key="platforms"
+                      className="flex h-10 w-full items-center justify-center rounded-landing-sm bg-[#eee] p-[5px] max-[600px]:h-auto max-[600px]:flex-wrap"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.2, ease: EASE_OUT }}
                     >
-                      {platform === item ? (
-                        <motion.span
-                          layoutId="installPlatformPill"
-                          className="absolute inset-0 rounded bg-white/90 shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
-                          transition={{ duration: 0.3, ease: EASE_OUT }}
-                        />
-                      ) : null}
-                      <span className="relative">{t(`install.platforms.${item}`)}</span>
-                    </button>
-                  ))}
-                </div>
-              ) : null}
+                      {PLATFORMS.map((item) => (
+                        <button
+                          key={item}
+                          type="button"
+                          className={cn(
+                            "text-ink relative inline-flex h-[30px] flex-1 cursor-pointer items-center justify-center rounded border-none bg-transparent px-4 py-[5px] font-[inherit] text-[13px] leading-5 whitespace-nowrap",
+                            platform === item && "font-medium",
+                          )}
+                          onClick={() => setPlatform(item)}
+                        >
+                          {platform === item ? (
+                            <motion.span
+                              layoutId="installPlatformPill"
+                              className="absolute inset-0 rounded bg-white/90 shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
+                              transition={{ duration: 0.3, ease: EASE_OUT }}
+                            />
+                          ) : null}
+                          <span className="relative">{t(`install.platforms.${item}`)}</span>
+                        </button>
+                      ))}
+                    </motion.div>
+                  ) : null}
+                </AnimatePresence>
+              </div>
 
-              <div className="flex w-full flex-col gap-3">
+              <div className="flex w-full flex-col gap-6 max-[600px]:gap-4">
                 <AnimatePresence mode="wait" initial={false}>
                   <motion.p
                     key={method}
@@ -187,11 +212,11 @@ export function InstallSection() {
                     {t(`install.hints.${method}`)}
                   </motion.p>
                 </AnimatePresence>
-                <div className="relative flex min-h-[212px] items-center justify-center rounded-landing-sm bg-[#f5f5f5] px-14 py-10 max-[600px]:min-h-[140px] max-[600px]:py-6 max-[600px]:pr-10 max-[600px]:pl-4">
+                <div className="relative flex h-[132px] items-center rounded-landing-md bg-[#f2f2f2] px-10 py-7 max-[900px]:h-auto max-[900px]:min-h-[110px] max-[600px]:min-h-[100px] max-[600px]:py-5 max-[600px]:pr-10 max-[600px]:pl-4">
                   <AnimatePresence mode="wait" initial={false}>
                     <motion.code
                       key={`${method}-${platform}`}
-                      className="text-ink text-center font-[inherit] text-sm leading-[22px] break-all"
+                      className="font-fira-code text-ink text-left text-sm leading-[22px] break-words"
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
@@ -233,6 +258,14 @@ export function InstallSection() {
                   </AnimatePresence>
                 </div>
               </div>
+
+              <div
+                className={cn(
+                  "w-full transition-[height] duration-300 ease-out",
+                  method === "script" ? "h-0" : "h-9 max-[600px]:h-[30px]",
+                )}
+                aria-hidden="true"
+              />
             </div>
           </div>
         </motion.div>

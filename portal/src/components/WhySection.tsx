@@ -91,10 +91,10 @@ function FeatureBlock({
       ) : null}
 
       <motion.header className="flex max-w-[593px] flex-col gap-4" variants={rise}>
-        <h3 className="text-2xl leading-8 font-medium text-black">
+        <h3 className="text-xl leading-7 font-medium text-black">
           {t(`why.items.${block.id}.title`)}
         </h3>
-        <p className="text-ink-faint text-lg leading-[26px] max-[600px]:text-[15px] max-[600px]:leading-6">
+        <p className="text-ink-faint text-base leading-6 max-[600px]:text-sm max-[600px]:leading-[22px]">
           {t(`why.items.${block.id}.desc`)}
         </p>
       </motion.header>
@@ -106,7 +106,6 @@ function FeatureBlock({
         <div className="absolute inset-0" aria-hidden="true">
           <img src={block.bg} alt="" className="size-full object-cover" />
           <span className="absolute inset-0 bg-brand mix-blend-soft-light" />
-          <span className="absolute inset-0 bg-linear-to-b from-white from-[8.5%] to-white/0" />
         </div>
 
         <motion.img
@@ -164,21 +163,21 @@ export function WhySection() {
         <aside>
           <motion.div className="sticky top-[120px] max-[1280px]:static" {...staggerParent(0.12)}>
             <motion.h2
-              className="inline-block text-[42px] leading-[50px] font-semibold text-black max-[600px]:text-[32px] max-[600px]:leading-10"
+              className="inline-block text-[36px] leading-[44px] font-semibold text-black max-[600px]:text-[28px] max-[600px]:leading-9"
               variants={rise}
             >
               {t("why.title_lead")}{" "}
-              <span className="relative inline-block whitespace-nowrap">
+              <span className="relative z-0 inline-block whitespace-nowrap">
                 Octop
                 <img
                   src={underlineWhy}
                   alt=""
-                  className="pointer-events-none absolute top-[calc(100%-10px)] left-0 h-3.5 w-full select-none"
+                  className="pointer-events-none absolute top-[calc(100%-10px)] left-0 -z-10 h-3.5 w-full select-none"
                 />
               </span>
             </motion.h2>
             <motion.p
-              className="text-ink-faint mt-7 text-xl leading-7 max-[600px]:text-base max-[600px]:leading-6"
+              className="text-ink-faint mt-7 text-lg leading-[26px] max-[600px]:text-[15px] max-[600px]:leading-6"
               variants={rise}
             >
               {t("why.desc")}
@@ -193,7 +192,7 @@ export function WhySection() {
                   key={block.id}
                   type="button"
                   className={cn(
-                    "text-ink-faint hover:text-ink-secondary relative max-w-[220px] cursor-pointer border-none bg-transparent p-0 text-left font-[inherit] text-xl leading-7 transition-colors duration-200 ease-out",
+                    "text-ink-faint hover:text-ink-secondary relative max-w-[220px] cursor-pointer border-none bg-transparent p-0 text-left font-[inherit] text-[17px] leading-[26px] transition-colors duration-200 ease-out",
                     activeId === block.id && "font-medium text-black",
                   )}
                   onClick={() => scrollToBlock(block.id)}

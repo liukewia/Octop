@@ -4,11 +4,10 @@ import { useTranslation } from "react-i18next";
 import { ChevronDown, Download, Monitor } from "lucide-react";
 import appleIcon from "@/assets/landing/apple.svg";
 import sectionDesktopPet from "@/assets/landing/section-desktop-pet.png";
-import octopusPet from "@/assets/landing/octopus-pet.webp";
 import underlineInstall from "@/assets/landing/underline-install.svg";
 import { OCTOP_PET_RELEASES_URL } from "@/constants/links";
 import { cn } from "@/lib/utils";
-import { EASE_OUT, fadeUp, hoverLift, popIn, rise, staggerParent } from "@/motion";
+import { EASE_OUT, hoverLift, rise, staggerParent } from "@/motion";
 
 type PetPlatform = "mac_arm" | "mac_intel" | "win_x64" | "win_arm";
 
@@ -132,67 +131,68 @@ export function PetSection() {
 
   return (
     <section className="pt-[200px] max-[900px]:pt-24" id="pet">
-      <div className="page-container grid grid-cols-[465px_minmax(0,859px)] justify-between gap-[60px] max-[1280px]:grid-cols-[minmax(0,1fr)] max-[1280px]:gap-10">
-        <motion.div className="relative pb-[280px] max-[1280px]:pb-0" {...staggerParent(0.12)}>
+      <div className="page-container grid grid-cols-[minmax(0,859px)_465px] justify-between gap-[60px] max-[1280px]:grid-cols-[minmax(0,1fr)] max-[1280px]:gap-10">
+        <motion.img
+          src={sectionDesktopPet}
+          alt={t("pet.title")}
+          className="block h-auto w-full min-w-0 rounded-landing-md border border-line-subtle bg-surface-subtle"
+          loading="lazy"
+          initial={{ opacity: 0, scale: 1.04 }}
+          whileInView={{ opacity: 1, scale: 1 }}
+          viewport={{ once: true, amount: 0.3 }}
+          transition={{ duration: 0.9, ease: EASE_OUT }}
+        />
+
+        <motion.div
+          className="flex min-w-0 flex-col max-[1280px]:order-first"
+          {...staggerParent(0.12)}
+        >
           <motion.h2
-            className="relative inline-block text-[42px] leading-[50px] font-semibold text-black max-[600px]:text-[32px] max-[600px]:leading-10"
+            className="text-[36px] leading-[44px] font-semibold text-black max-[600px]:text-[28px] max-[600px]:leading-9"
             variants={rise}
           >
-            {t("pet.title")}
-            <img
-              src={underlineInstall}
-              alt=""
-              className="pointer-events-none absolute top-10 left-0 h-3.5 w-[170px] select-none"
-            />
+            {t("pet.title_before")}
+            <span className="relative z-0 inline-block whitespace-nowrap">
+              {t("pet.title_mark")}
+              <img
+                src={underlineInstall}
+                alt=""
+                className="pointer-events-none absolute top-[calc(100%-10px)] left-0 -z-10 h-3.5 w-full select-none"
+              />
+            </span>
+            {t("pet.title_rest")}
           </motion.h2>
           <motion.p
-            className="text-ink-muted mt-8 text-xl leading-7 max-[600px]:text-base max-[600px]:leading-6"
+            className="text-ink-muted mt-6 text-[15px] leading-6 max-[600px]:text-sm"
             variants={rise}
           >
             {t("pet.desc")}
           </motion.p>
-          <motion.img
-            src={octopusPet}
-            alt=""
-            className="absolute left-[-12px] h-auto w-[260px] max-[1280px]:static max-[1280px]:mt-6 max-[1280px]:block max-[1280px]:w-[180px]"
-            loading="lazy"
-            variants={popIn}
-          />
-        </motion.div>
 
-        <motion.div className="flex min-w-0 flex-col gap-6" {...fadeUp(0.1, 36)}>
-          <motion.img
-            src={sectionDesktopPet}
-            alt={t("pet.title")}
-            className="block h-auto w-full rounded-landing-md border border-line-subtle bg-surface-subtle"
-            loading="lazy"
-            initial={{ opacity: 0, scale: 1.04 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true, amount: 0.3 }}
-            transition={{ duration: 0.9, ease: EASE_OUT }}
-          />
-
-          <div className="flex flex-wrap items-center gap-3">
+          <motion.div
+            className="flex flex-wrap items-center gap-3 pt-10 max-[1280px]:justify-start"
+            variants={rise}
+          >
             <motion.a
-              className="inline-flex h-[50px] items-center gap-2 rounded-landing-md bg-black px-8 text-base leading-6 font-medium text-white no-underline max-[900px]:h-12 max-[900px]:px-6 max-[900px]:text-[15px] max-[600px]:h-10 max-[600px]:px-4 max-[600px]:text-sm"
+              className="inline-flex h-10 items-center gap-2 rounded-landing-md bg-black px-5 text-sm leading-5 font-medium text-white no-underline max-[600px]:h-9 max-[600px]:px-4 max-[600px]:text-[13px]"
               href={primaryUrl}
               {...hoverLift}
             >
-              <Download size={18} />
+              <Download size={16} />
               {primaryLabel}
             </motion.a>
 
             <div className="relative" ref={menuRef}>
               <button
                 type="button"
-                className="border-line-strong text-ink-secondary hover:text-ink inline-flex h-[50px] cursor-pointer items-center gap-2 rounded-landing-md border bg-white px-6 text-base leading-6 font-medium transition-colors duration-200 ease-out hover:bg-surface-subtle max-[900px]:h-12 max-[900px]:px-5 max-[900px]:text-[15px] max-[600px]:h-10 max-[600px]:px-4 max-[600px]:text-sm"
+                className="border-line-strong text-ink-secondary hover:text-ink inline-flex h-10 cursor-pointer items-center gap-2 rounded-landing-md border bg-white px-4 text-sm leading-5 font-medium transition-colors duration-200 ease-out hover:bg-surface-subtle max-[600px]:h-9 max-[600px]:px-3 max-[600px]:text-[13px]"
                 aria-expanded={menuOpen}
                 aria-haspopup="menu"
                 onClick={() => setMenuOpen((open) => !open)}
               >
                 {t("pet.all_platforms")}
                 <ChevronDown
-                  size={16}
+                  size={14}
                   className={cn("transition-transform duration-200", menuOpen && "rotate-180")}
                 />
               </button>
@@ -252,7 +252,7 @@ export function PetSection() {
                 ) : null}
               </AnimatePresence>
             </div>
-          </div>
+          </motion.div>
         </motion.div>
       </div>
     </section>

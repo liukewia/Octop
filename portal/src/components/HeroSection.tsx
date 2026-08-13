@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { ArrowRight, Bot, Check, Github, MousePointer2, ShieldCheck, Terminal } from "lucide-react";
 import heroBgMp4 from "@/assets/landing/hero-bg.mp4";
 import heroBgWebp from "@/assets/landing/hero-bg.webp";
-import heroChat from "@/assets/landing/hero-chat.webp";
+import heroChat from "@/assets/landing/hero-chat.png";
 import octopMascotType from "@/assets/landing/octop-mascot-type.webp";
 import { DOCS_URL, GITHUB_URL } from "@/constants/links";
 import { cn } from "@/lib/utils";
@@ -203,7 +203,7 @@ export function HeroSection() {
         </motion.h1>
 
         <motion.p
-          className="text-ink-muted mt-5 max-w-[1020px] text-base leading-6"
+          className="text-ink-muted mt-1 max-w-[1020px] text-base leading-6"
           variants={rise}
         >
           {t("hero.subtitle")}
@@ -242,7 +242,7 @@ export function HeroSection() {
           <motion.img
             src={heroChat}
             alt={t("hero.screenshot_alt")}
-            className="block h-auto w-full rounded-landing-card"
+            className="block h-auto w-full rounded-t-landing-card"
             initial={{ opacity: 0, scale: 0.97, rotateX: 8 }}
             animate={{ opacity: 1, scale: 1, rotateX: 0 }}
             transition={{ duration: 1.1, delay: 0.45, ease: EASE_OUT }}
