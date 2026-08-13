@@ -43,7 +43,7 @@ export function Navbar() {
     >
       <div className="relative flex h-16 items-center justify-between gap-6 px-20 max-[1280px]:px-10 max-[600px]:px-5">
         <motion.a
-          href="/"
+          href={import.meta.env.BASE_URL}
           className="flex shrink-0 items-center no-underline"
           aria-label="Octop"
           initial={{ opacity: 0 }}
