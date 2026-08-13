@@ -2,7 +2,7 @@ name: Deploy Portal to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches: [gh-pages]
     paths:
       - "portal/**"
       - ".github/workflows/deploy-portal.yml"
