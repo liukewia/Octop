@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useTranslation } from "react-i18next";
 import { ChevronDown, Download, Monitor } from "lucide-react";
 import appleIcon from "@/assets/landing/apple.svg";
-import featureDesktopPet from "@/assets/landing/feature-desktop-pet.png";
+import sectionDesktopPet from "@/assets/landing/section-desktop-pet.png";
 import octopusPet from "@/assets/landing/octopus-pet.webp";
 import underlineInstall from "@/assets/landing/underline-install.svg";
 import { OCTOP_PET_RELEASES_URL } from "@/constants/links";
@@ -18,6 +18,9 @@ type PlatformSpec = {
   ext: string;
   url: string;
 };
+
+/** Keep the platform menu this far away from the viewport edges. */
+const MENU_VIEWPORT_MARGIN = 16;
 
 const PET_VERSION = "0.1.0";
 const DOWNLOAD_BASE = `${OCTOP_PET_RELEASES_URL}/download/v${PET_VERSION}`;
@@ -76,7 +79,9 @@ export function PetSection() {
   const { t } = useTranslation();
   const [detected, setDetected] = useState<PetPlatform | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuOffset, setMenuOffset] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setDetected(detectPlatform());
@@ -96,6 +101,27 @@ export function PetSection() {
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
     };
+  }, [menuOpen]);
+
+  // Align the menu to the trigger's left edge, flipping to the right edge when the
+  // panel would overflow the viewport, then clamp so neither side is cut off.
+  useLayoutEffect(() => {
+    if (!menuOpen) return;
+    const align = () => {
+      const trigger = menuRef.current;
+      const panel = panelRef.current;
+      if (!trigger || !panel) return;
+      const rect = trigger.getBoundingClientRect();
+      const width = panel.offsetWidth;
+      const maxLeft = window.innerWidth - MENU_VIEWPORT_MARGIN - width;
+      let offset = 0;
+      if (rect.left > maxLeft) offset = rect.width - width;
+      if (rect.left + offset < MENU_VIEWPORT_MARGIN) offset = MENU_VIEWPORT_MARGIN - rect.left;
+      setMenuOffset(offset);
+    };
+    align();
+    window.addEventListener("resize", align);
+    return () => window.removeEventListener("resize", align);
   }, [menuOpen]);
 
   const primary = PLATFORMS.find((platform) => platform.id === detected);
@@ -136,7 +162,7 @@ export function PetSection() {
 
         <motion.div className="flex min-w-0 flex-col gap-6" {...fadeUp(0.1, 36)}>
           <motion.img
-            src={featureDesktopPet}
+            src={sectionDesktopPet}
             alt={t("pet.title")}
             className="block h-auto w-full rounded-landing-md border border-line-subtle bg-surface-subtle"
             loading="lazy"
@@ -148,7 +174,7 @@ export function PetSection() {
 
           <div className="flex flex-wrap items-center gap-3">
             <motion.a
-              className="inline-flex h-[50px] items-center gap-2 rounded-landing-md bg-black px-8 text-base leading-6 font-medium text-white no-underline max-[600px]:h-11 max-[600px]:px-5 max-[600px]:text-sm"
+              className="inline-flex h-[50px] items-center gap-2 rounded-landing-md bg-black px-8 text-base leading-6 font-medium text-white no-underline max-[900px]:h-12 max-[900px]:px-6 max-[900px]:text-[15px] max-[600px]:h-10 max-[600px]:px-4 max-[600px]:text-sm"
               href={primaryUrl}
               {...hoverLift}
             >
@@ -159,7 +185,7 @@ export function PetSection() {
             <div className="relative" ref={menuRef}>
               <button
                 type="button"
-                className="border-line-strong text-ink-secondary hover:text-ink inline-flex h-[50px] cursor-pointer items-center gap-2 rounded-landing-md border bg-white px-6 text-base leading-6 font-medium transition-colors duration-200 ease-out hover:bg-surface-subtle max-[600px]:h-11 max-[600px]:px-4 max-[600px]:text-sm"
+                className="border-line-strong text-ink-secondary hover:text-ink inline-flex h-[50px] cursor-pointer items-center gap-2 rounded-landing-md border bg-white px-6 text-base leading-6 font-medium transition-colors duration-200 ease-out hover:bg-surface-subtle max-[900px]:h-12 max-[900px]:px-5 max-[900px]:text-[15px] max-[600px]:h-10 max-[600px]:px-4 max-[600px]:text-sm"
                 aria-expanded={menuOpen}
                 aria-haspopup="menu"
                 onClick={() => setMenuOpen((open) => !open)}
@@ -174,8 +200,10 @@ export function PetSection() {
               <AnimatePresence>
                 {menuOpen ? (
                   <motion.div
+                    ref={panelRef}
                     role="menu"
-                    className="border-line-subtle absolute top-full left-0 z-20 mt-2 w-[400px] overflow-hidden rounded-landing-md border bg-white shadow-[0_12px_32px_rgba(0,0,0,0.12)] max-[600px]:w-[min(320px,calc(100vw-40px))]"
+                    className="border-line-subtle absolute top-full z-20 mt-2 w-[280px] overflow-hidden rounded-landing-md border bg-white shadow-[0_12px_32px_rgba(0,0,0,0.12)] max-[600px]:w-[min(280px,calc(100vw-40px))]"
+                    style={{ left: menuOffset }}
                     initial={{ opacity: 0, y: -8 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -8 }}

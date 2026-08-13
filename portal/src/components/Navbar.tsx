@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { changeLocale } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { readStoredUiLocale, type UiLocale } from "@/utils/localePrefs";
-import logoWordmark from "@/assets/landing/logo-wordmark.svg";
+import logoName from "@/assets/landing/logo_name.png";
 import { CHANGELOG_URL, DOCS_URL } from "@/constants/links";
 import { EASE_OUT } from "@/motion";
 
@@ -44,13 +44,13 @@ export function Navbar() {
       <div className="relative flex h-16 items-center justify-between gap-6 px-20 max-[1280px]:px-10 max-[600px]:px-5">
         <motion.a
           href={import.meta.env.BASE_URL}
-          className="flex shrink-0 items-center no-underline"
+          className="flex shrink-0 items-center gap-2 no-underline"
           aria-label="Octop"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.2 }}
         >
-          <img src={logoWordmark} alt="Octop" className="h-[26px] w-[80.6px] object-contain" />
+          <img src={logoName} alt="Octop" className="h-9 w-auto object-contain" />
         </motion.a>
 
         <div className="absolute top-1/2 left-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-8 max-[900px]:hidden">

@@ -13,7 +13,7 @@ export function FaqSection() {
   const [openId, setOpenId] = useState<string | null>(FAQ_IDS[0]);
 
   return (
-    <section className="pt-[200px] max-[900px]:pt-24" id="faq">
+    <section className="pt-16 max-[900px]:pt-10" id="faq">
       <div className="page-container grid grid-cols-[465px_minmax(0,843px)] justify-between gap-[60px] max-[1280px]:grid-cols-[minmax(0,1fr)] max-[1280px]:gap-10">
         <motion.div
           className="relative pb-[300px] max-[1280px]:pb-0"

@@ -52,27 +52,27 @@
   },
   "why": {
     "title_lead": "Why",
-    "desc": "It runs on your own machine, works for a whole team, and lets you switch assistants for different jobs.",
+    "desc": "Not another chat box. It lives on your own machine and knows your people, your tools and your computer — so it can actually get things done for you.",
     "items": {
       "multi_user": {
-        "title": "One system, many assistants",
-        "desc": "A family or team shares a single deployment while everyone keeps their own assistant — and can switch to a better-suited expert for reports, research or code."
+        "title": "Deploy once, everyone gets an assistant",
+        "desc": "One service on one machine, and every person gets an assistant that only remembers their own things. Call in an analyst for the weekly report, a researcher for digging — swap the role, keep the setup."
       },
       "connectors": {
-        "title": "Connects to the services you use",
-        "desc": "Hook it up to everyday tools such as Tencent Docs, and add more services whenever you need them."
+        "title": "Plugs into accounts you already use",
+        "desc": "Tencent Docs, Tencent Meeting, Notion, mail — authorize once, then just say \"put today's meeting takeaways in the doc\". No more copy-paste round trips."
       },
       "coding": {
-        "title": "Works alongside your coding tools",
-        "desc": "It cooperates with the AI in your editor and terminal, and hands complex work over to dedicated coding agents."
+        "title": "Teams up with your editor and terminal",
+        "desc": "It won't fight the Cursor and CLI you already live in: heavy changes go to dedicated coding agents over ACP, and you only review the result."
       },
       "computer": {
-        "title": "Knows its way around your computer",
-        "desc": "It runs terminal commands and troubleshoots for you, and can open pages, fill forms and take screenshots on its own."
+        "title": "It really knows how to drive a computer",
+        "desc": "Running commands, clicking through pages, filling forms, grabbing a screenshot as proof — you name the goal, it does the moving and only comes back when it's stuck."
       },
       "desktop_pet": {
-        "title": "A desktop companion, always nearby",
-        "desc": "The floating pet stays on your desktop and answers on demand — capture an idea the moment it appears, no browser required."
+        "title": "Keep one on your desktop",
+        "desc": "Ask the moment a thought shows up — no window switching, no waiting for a browser. The rest of the time it just idles in the corner of your screen."
       }
     }
   },
@@ -86,7 +86,7 @@
     "platforms": {
       "mac_arm": {
         "label": "macOS Apple Silicon",
-        "meta": "M1 / M2 / M3 and later"
+        "meta": "M-series chips"
       },
       "mac_intel": {
         "label": "macOS Intel",

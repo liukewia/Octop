@@ -38,20 +38,20 @@ export function CtaSection() {
         {...staggerParent(0.12)}
       >
         <motion.h2
-          className="max-w-[934px] text-[48px] leading-[56px] font-semibold text-black max-[900px]:text-[32px] max-[900px]:leading-[42px] max-[600px]:text-[26px] max-[600px]:leading-9"
+          className="max-w-[934px] text-[48px] leading-[56px] font-semibold text-black max-[900px]:max-w-[calc(100%-160px)] max-[900px]:text-[32px] max-[900px]:leading-[42px] max-[600px]:max-w-[calc(100%-116px)] max-[600px]:text-[26px] max-[600px]:leading-9"
           variants={rise}
         >
           {t("cta.title")}
         </motion.h2>
         <motion.div variants={rise}>
           <motion.a
-            className="inline-flex h-[50px] items-center gap-2 rounded-landing-md bg-[linear-gradient(133deg,rgb(102,102,102)_5.8%,rgb(0,0,0)_73%)] px-9 text-lg leading-[26px] font-medium tracking-[-0.45px] text-white no-underline"
+            className="inline-flex h-[50px] items-center gap-2 rounded-landing-md bg-[linear-gradient(133deg,rgb(102,102,102)_5.8%,rgb(0,0,0)_73%)] px-9 text-lg leading-[26px] font-medium tracking-[-0.45px] text-white no-underline max-[900px]:h-12 max-[900px]:gap-1.5 max-[900px]:px-7 max-[900px]:text-base max-[600px]:h-10 max-[600px]:px-5 max-[600px]:text-sm"
             href="#install"
             {...hoverLift}
           >
             {t("cta.button")}
             <motion.span className="inline-flex" variants={hoverArrow}>
-              <ArrowRight size={20} />
+              <ArrowRight className="size-5 max-[900px]:size-[18px] max-[600px]:size-4" />
             </motion.span>
           </motion.a>
         </motion.div>
@@ -60,7 +60,7 @@ export function CtaSection() {
       <motion.img
         src={octopMascotType}
         alt=""
-        className="absolute top-[16%] right-[10.4%] bottom-0 z-[1] my-auto h-auto w-[250px] -scale-x-100 max-[1280px]:right-[4%] max-[1280px]:w-[200px] max-[900px]:hidden"
+        className="absolute top-[16%] right-[10.4%] bottom-0 z-[1] my-auto h-auto w-[250px] -scale-x-100 max-[1280px]:right-[4%] max-[1280px]:w-[200px] max-[900px]:right-5 max-[900px]:w-[136px] max-[600px]:right-3 max-[600px]:w-[104px]"
         loading="lazy"
         initial={{ opacity: 0, y: 64, scaleX: -1 }}
         whileInView={{ opacity: 1, y: 0, scaleX: -1 }}

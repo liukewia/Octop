@@ -167,7 +167,6 @@ export function HeroSection() {
           transition={{ duration: 0.9, ease: EASE_OUT }}
           onCanPlay={() => setVideoReady(true)}
         />
-        <div className="absolute inset-x-0 bottom-0 h-[220px] bg-linear-to-b from-white/0 to-white to-[78%]" />
       </div>
 
       <motion.div
@@ -191,7 +190,7 @@ export function HeroSection() {
         </motion.a>
 
         <motion.h1
-          className="text-ink mt-3.5 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[52px] leading-[60px] font-semibold max-[900px]:text-[36px] max-[900px]:leading-[46px] max-[600px]:text-[28px] max-[600px]:leading-[38px]"
+          className="text-ink mt-3.5 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[48px] leading-[56px] font-semibold max-[900px]:text-[36px] max-[900px]:leading-[46px] max-[600px]:text-[28px] max-[600px]:leading-[38px]"
           variants={rise}
         >
           <span>{t("hero.title_lead")}</span>
@@ -204,25 +203,28 @@ export function HeroSection() {
         </motion.h1>
 
         <motion.p
-          className="text-ink-muted mt-5 max-w-[1020px] text-xl leading-7 max-[600px]:text-base max-[600px]:leading-6"
+          className="text-ink-muted mt-5 max-w-[1020px] text-base leading-6"
           variants={rise}
         >
           {t("hero.subtitle")}
         </motion.p>
 
-        <motion.div className="mt-12 flex items-center gap-4" variants={rise}>
+        <motion.div
+          className="mt-12 flex items-center gap-4 max-[900px]:mt-9 max-[600px]:gap-3"
+          variants={rise}
+        >
           <motion.a
-            className="inline-flex h-[50px] items-center gap-2 rounded-landing-md bg-black px-9 text-lg leading-[26px] font-medium whitespace-nowrap text-white no-underline transition-opacity duration-200 ease-out hover:opacity-[0.88] max-[600px]:h-11 max-[600px]:px-6 max-[600px]:text-base"
+            className="inline-flex h-[50px] items-center gap-2 rounded-landing-md bg-black px-9 text-lg leading-[26px] font-medium whitespace-nowrap text-white no-underline transition-opacity duration-200 ease-out hover:opacity-[0.88] max-[900px]:h-12 max-[900px]:gap-1.5 max-[900px]:px-7 max-[900px]:text-base max-[600px]:h-10 max-[600px]:px-5 max-[600px]:text-sm"
             href="#install"
             {...hoverLift}
           >
             {t("hero.cta_primary")}
             <motion.span className="inline-flex" variants={hoverArrow}>
-              <ArrowRight size={20} />
+              <ArrowRight className="size-5 max-[900px]:size-[18px] max-[600px]:size-4" />
             </motion.span>
           </motion.a>
           <motion.a
-            className="text-ink-secondary inline-flex h-[50px] items-center gap-2 rounded-landing-sm border border-line-subtle bg-white px-9 text-lg leading-[26px] font-medium whitespace-nowrap no-underline transition-colors duration-200 ease-out hover:bg-surface-subtle max-[600px]:h-11 max-[600px]:px-6 max-[600px]:text-base"
+            className="text-ink-secondary inline-flex h-[50px] items-center gap-2 rounded-landing-sm border border-line-subtle bg-white px-9 text-lg leading-[26px] font-medium whitespace-nowrap no-underline transition-colors duration-200 ease-out hover:bg-surface-subtle max-[900px]:h-12 max-[900px]:px-7 max-[900px]:text-base max-[600px]:h-10 max-[600px]:px-5 max-[600px]:text-sm"
             href={DOCS_URL}
             target="_blank"
             rel="noopener noreferrer"
