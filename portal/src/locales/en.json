@@ -109,7 +109,8 @@
     }
   },
   "faq": {
-    "title": "Questions & help",
+    "title_lead": "Questions ",
+    "title_highlight": "& help",
     "desc": "Find answers about Octop and how everything works.",
     "items": {
       "open_source": {

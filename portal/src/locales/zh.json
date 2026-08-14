@@ -109,7 +109,8 @@
     }
   },
   "faq": {
-    "title": "常问问题与帮助",
+    "title_lead": "常问问题",
+    "title_highlight": "与帮助",
     "desc": "在这里查找关于 Octop 的答案与一切如何运作的常见问题的解答。",
     "items": {
       "open_source": {

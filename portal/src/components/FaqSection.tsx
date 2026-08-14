@@ -20,12 +20,15 @@ export function FaqSection() {
             className="relative z-0 inline-block text-[42px] leading-[52px] font-semibold text-black max-[600px]:text-[28px] max-[600px]:leading-9"
             variants={rise}
           >
-            {t("faq.title")}
-            <img
-              src={underlineFaq}
-              alt=""
-              className="pointer-events-none absolute top-[1.08em] left-[3.94em] -z-10 h-[0.61em] w-[4.22em] select-none"
-            />
+            {t("faq.title_lead")}
+            <span className="relative z-0 inline-block whitespace-nowrap">
+              {t("faq.title_highlight")}
+              <img
+                src={underlineFaq}
+                alt=""
+                className="pointer-events-none absolute top-[1.14em] left-[-0.12em] -z-10 h-[0.4em] w-[calc(100%+0.24em)] select-none"
+              />
+            </span>
           </motion.h2>
           <motion.p
             className="text-ink-faint mt-8 text-base leading-6 max-[600px]:text-[15px]"
