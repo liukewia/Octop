@@ -15,23 +15,20 @@ export function FaqSection() {
   return (
     <section className="pt-[200px] max-[900px]:pt-10" id="faq">
       <div className="page-container grid grid-cols-[465px_minmax(0,843px)] justify-between gap-[100px] max-[1280px]:grid-cols-[minmax(0,1fr)] max-[1280px]:gap-10">
-        <motion.div
-          className="relative pb-[300px] max-[1280px]:pb-0"
-          {...staggerParent(0.12)}
-        >
+        <motion.div className="relative pb-[300px] max-[1280px]:pb-0" {...staggerParent(0.12)}>
           <motion.h2
-            className="relative z-0 inline-block text-[36px] leading-[44px] font-semibold text-black max-[600px]:text-[28px] max-[600px]:leading-9"
+            className="relative z-0 inline-block text-[42px] leading-[52px] font-semibold text-black max-[600px]:text-[28px] max-[600px]:leading-9"
             variants={rise}
           >
             {t("faq.title")}
             <img
               src={underlineFaq}
               alt=""
-              className="pointer-events-none absolute top-[39px] left-[142px] -z-10 h-[22px] w-[152px] select-none"
+              className="pointer-events-none absolute top-[1.08em] left-[3.94em] -z-10 h-[0.61em] w-[4.22em] select-none"
             />
           </motion.h2>
           <motion.p
-            className="text-ink-muted mt-8 text-lg leading-[26px] max-[600px]:text-[15px] max-[600px]:leading-6"
+            className="text-ink-faint mt-8 text-base leading-6 max-[600px]:text-[15px]"
             variants={rise}
           >
             {t("faq.desc")}
@@ -45,10 +42,7 @@ export function FaqSection() {
           />
         </motion.div>
 
-        <motion.div
-          className="flex flex-col pr-[60px] max-[1280px]:pr-0"
-          {...staggerParent(0.08)}
-        >
+        <motion.div className="flex flex-col pr-[60px] max-[1280px]:pr-0" {...staggerParent(0.08)}>
           {FAQ_IDS.map((id) => {
             const open = openId === id;
             return (
@@ -59,7 +53,7 @@ export function FaqSection() {
               >
                 <button
                   type="button"
-                  className="flex w-full cursor-pointer items-center justify-between gap-6 border-none bg-transparent py-5 text-left font-[inherit] text-[17px] leading-6 text-black max-[600px]:text-[15px]"
+                  className="flex w-full cursor-pointer items-center justify-between gap-6 border-none bg-transparent py-5 text-left font-[inherit] text-base leading-6 text-black max-[600px]:text-[15px]"
                   aria-expanded={open}
                   onClick={() => setOpenId(open ? null : id)}
                 >
@@ -87,7 +81,7 @@ export function FaqSection() {
                       exit={{ height: 0, opacity: 0 }}
                       transition={{ duration: 0.36, ease: EASE_OUT }}
                     >
-                      <p className="text-ink-muted pb-5 text-[15px] leading-[26px] max-[600px]:text-sm max-[600px]:leading-6">
+                      <p className="text-ink-muted pb-5 text-base leading-[26px] max-[600px]:text-sm max-[600px]:leading-6">
                         {t(`faq.items.${id}.a`)}
                       </p>
                     </motion.div>

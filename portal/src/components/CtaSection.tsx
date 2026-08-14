@@ -57,10 +57,12 @@ export function CtaSection() {
         </motion.div>
       </motion.div>
 
+      {/* Wide layout: park the octopus 80px inside the (max 1440px) content column instead of a
+          viewport percentage, so it keeps the same distance from the copy as the window grows. */}
       <motion.img
         src={ctaBeachOctop}
         alt=""
-        className="absolute top-[16%] right-[10.4%] bottom-0 z-[1] my-auto h-auto w-[250px] -scale-x-100 max-[1280px]:right-[4%] max-[1280px]:w-[200px] max-[900px]:right-5 max-[900px]:w-[136px] max-[600px]:right-3 max-[600px]:w-[104px]"
+        className="absolute top-[16%] right-[calc(50%-560px)] bottom-0 z-[1] my-auto h-auto w-[320px] -scale-x-100 max-[1440px]:w-[280px] max-[1280px]:right-[4%] max-[1280px]:w-[200px] max-[900px]:right-5 max-[900px]:w-[136px] max-[600px]:right-3 max-[600px]:w-[104px]"
         loading="lazy"
         initial={{ opacity: 0, y: 64, scaleX: -1 }}
         whileInView={{ opacity: 1, y: 0, scaleX: -1 }}

@@ -91,7 +91,7 @@ function FeatureBlock({
       ) : null}
 
       <motion.header className="flex max-w-[593px] flex-col gap-4" variants={rise}>
-        <h3 className="text-xl leading-7 font-medium text-black">
+        <h3 className="text-2xl leading-8 font-medium text-black max-[900px]:text-xl max-[900px]:leading-7">
           {t(`why.items.${block.id}.title`)}
         </h3>
         <p className="text-ink-faint text-base leading-6 max-[600px]:text-sm max-[600px]:leading-[22px]">
@@ -163,7 +163,7 @@ export function WhySection() {
         <aside>
           <motion.div className="sticky top-[120px] max-[1280px]:static" {...staggerParent(0.12)}>
             <motion.h2
-              className="inline-block text-[36px] leading-[44px] font-semibold text-black max-[600px]:text-[28px] max-[600px]:leading-9"
+              className="inline-block text-[42px] leading-[52px] font-semibold text-black max-[600px]:text-[28px] max-[600px]:leading-9"
               variants={rise}
             >
               {t("why.title_lead")}{" "}
@@ -172,13 +172,13 @@ export function WhySection() {
                 <img
                   src={underlineWhy}
                   alt=""
-                  className="pointer-events-none absolute top-[calc(100%-10px)] left-0 -z-10 h-3.5 w-full select-none"
+                  className="pointer-events-none absolute top-[calc(100%-0.28em)] left-0 -z-10 h-3.5 w-full select-none"
                 />
               </span>
             </motion.h2>
 
             <motion.nav
-              className="mt-[76px] flex flex-col items-start gap-9 border-l-[3px] border-transparent pl-5 max-[1280px]:hidden"
+              className="mt-[76px] flex flex-col items-start gap-9 max-[1280px]:hidden"
               variants={rise}
             >
               {BLOCKS.map((block) => (
@@ -186,7 +186,7 @@ export function WhySection() {
                   key={block.id}
                   type="button"
                   className={cn(
-                    "text-ink-faint hover:text-ink-secondary relative max-w-[220px] cursor-pointer border-none bg-transparent p-0 text-left font-[inherit] text-[17px] leading-[26px] transition-colors duration-200 ease-out",
+                    "text-ink-faint hover:text-ink-secondary relative max-w-[220px] cursor-pointer border-none bg-transparent p-0 text-left font-[inherit] text-base leading-6 transition-colors duration-200 ease-out",
                     activeId === block.id && "font-medium text-black",
                   )}
                   onClick={() => scrollToBlock(block.id)}
@@ -194,7 +194,7 @@ export function WhySection() {
                   {activeId === block.id ? (
                     <motion.span
                       layoutId="whyNavMarker"
-                      className="absolute inset-y-0 left-[-23px] w-[3px] rounded-[3px] bg-black"
+                      className="absolute inset-y-0 left-[-12px] w-[3px] rounded-[3px] bg-black"
                       transition={{ duration: 0.4, ease: EASE_OUT }}
                     />
                   ) : null}

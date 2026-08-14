@@ -53,6 +53,7 @@ export function initI18n(): Promise<void> {
       });
 
       syncDocumentLang(initial);
+      document.title = i18n.t("app.pageTitle");
 
       // Prefetch the fallback bundle during idle time
       const prefetchFallback = () => {
@@ -67,6 +68,7 @@ export function initI18n(): Promise<void> {
       i18n.on("languageChanged", (lng) => {
         const locale: UiLocale = lng.startsWith("zh") ? "zh" : "en";
         syncDocumentLang(locale);
+        document.title = i18n.t("app.pageTitle");
         void ensureLocaleBundle(locale);
       });
     })();

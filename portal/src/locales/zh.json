@@ -1,4 +1,7 @@
 {
+  "app": {
+    "pageTitle": "Octop - 生而为云，懂云更懂你！"
+  },
   "nav": {
     "overview": "概览",
     "changelog": "更新日志",

@@ -148,7 +148,7 @@ export function PetSection() {
           {...staggerParent(0.12)}
         >
           <motion.h2
-            className="text-[36px] leading-[44px] font-semibold text-black max-[600px]:text-[28px] max-[600px]:leading-9"
+            className="text-[42px] leading-[52px] font-semibold text-black max-[600px]:text-[28px] max-[600px]:leading-9"
             variants={rise}
           >
             {t("pet.title_before")}
@@ -157,13 +157,13 @@ export function PetSection() {
               <img
                 src={underlineInstall}
                 alt=""
-                className="pointer-events-none absolute top-[calc(100%-10px)] left-0 -z-10 h-3.5 w-full select-none"
+                className="pointer-events-none absolute top-[calc(100%-0.28em)] left-0 -z-10 h-3.5 w-full select-none"
               />
             </span>
             {t("pet.title_rest")}
           </motion.h2>
           <motion.p
-            className="text-ink-muted mt-6 text-[15px] leading-6 max-[600px]:text-sm"
+            className="text-ink-faint mt-6 text-base leading-6 max-[600px]:text-sm"
             variants={rise}
           >
             {t("pet.desc")}

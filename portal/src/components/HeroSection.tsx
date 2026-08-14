@@ -197,7 +197,7 @@ export function HeroSection() {
           <img
             src={octopMascotType}
             alt=""
-            className="size-[100px] object-contain object-bottom max-[900px]:size-[92px]"
+            className="size-[80px] object-contain object-bottom max-[900px]:size-[92px]"
           />
           <span>{t("hero.title_trail")}</span>
         </motion.h1>

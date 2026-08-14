@@ -2,7 +2,7 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useTranslation } from "react-i18next";
 import { Check, Copy } from "lucide-react";
-import installBg1 from "@/assets/landing/hero-bg.webp";
+import installBg1 from "@/assets/landing/install-bg-1.png";
 import installBg2 from "@/assets/landing/install-bg-2.png";
 import installBg3 from "@/assets/landing/install-bg-3.png";
 import octopHi from "@/assets/landing/octop-hi.png";
@@ -92,18 +92,18 @@ export function InstallSection() {
       <div className="page-container grid grid-cols-[465px_minmax(0,859px)] justify-between gap-[60px] max-[1280px]:grid-cols-[minmax(0,1fr)] max-[1280px]:gap-10">
         <motion.div className="relative pb-[310px] max-[1280px]:pb-0" {...staggerParent(0.12)}>
           <motion.h2
-            className="relative z-0 inline-block text-[36px] leading-[44px] font-semibold text-black max-[600px]:text-[28px] max-[600px]:leading-9"
+            className="relative z-0 inline-block text-[42px] leading-[52px] font-semibold text-black max-[600px]:text-[28px] max-[600px]:leading-9"
             variants={rise}
           >
             {t("install.title")}
             <img
               src={underlineInstall}
               alt=""
-              className="pointer-events-none absolute top-10 left-[-1px] -z-10 h-3.5 w-[calc(100%+8px)] select-none"
+              className="pointer-events-none absolute top-[1.12em] left-[-1px] -z-10 h-3.5 w-[calc(100%+8px)] select-none"
             />
           </motion.h2>
           <motion.p
-            className="text-ink-muted mt-8 text-lg leading-[26px] max-[600px]:text-[15px] max-[600px]:leading-6"
+            className="text-ink-faint mt-8 text-base leading-6 max-[600px]:text-[15px]"
             variants={rise}
           >
             {t("install.desc")}
@@ -179,7 +179,7 @@ export function InstallSection() {
                 className={cn(
                   "flex w-full items-start overflow-hidden transition-[height] duration-300 ease-out",
                   method === "script"
-                    ? "h-[72px] max-[600px]:h-auto max-[600px]:min-h-[60px] max-[600px]:pb-5"
+                    ? "h-[72px] max-[900px]:h-auto max-[900px]:min-h-[72px] max-[600px]:min-h-[60px] max-[600px]:pb-5"
                     : "h-9 max-[600px]:h-[30px]",
                 )}
               >
@@ -187,30 +187,31 @@ export function InstallSection() {
                   {method === "script" ? (
                     <motion.div
                       key="platforms"
-                      className="flex h-10 w-full items-center justify-center rounded-landing-sm bg-[#eee] p-[5px] max-[600px]:h-auto max-[600px]:flex-wrap"
+                      className="relative grid min-h-10 w-full grid-cols-3 items-stretch rounded-landing-sm bg-[#eee] p-[5px]"
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
                       transition={{ duration: 0.2, ease: EASE_OUT }}
                     >
+                      {/* The pill is a single element translated by whole columns, so its position never
+                          depends on layout measurement of the animating card around it. */}
+                      <motion.span
+                        className="absolute top-[5px] bottom-[5px] left-[5px] w-[calc((100%-10px)/3)] rounded bg-white/90 shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
+                        initial={false}
+                        animate={{ x: `${PLATFORMS.indexOf(platform) * 100}%` }}
+                        transition={{ duration: 0.3, ease: EASE_OUT }}
+                      />
                       {PLATFORMS.map((item) => (
                         <button
                           key={item}
                           type="button"
                           className={cn(
-                            "text-ink relative inline-flex h-[30px] flex-1 cursor-pointer items-center justify-center rounded border-none bg-transparent px-4 py-[5px] font-[inherit] text-[13px] leading-5 whitespace-nowrap",
+                            "text-ink relative inline-flex min-h-[30px] min-w-0 cursor-pointer items-center justify-center rounded border-none bg-transparent px-4 py-[5px] text-center font-[inherit] text-[13px] leading-[18px] break-words hyphens-none max-[900px]:px-2 max-[600px]:text-xs",
                             platform === item && "font-medium",
                           )}
                           onClick={() => setPlatform(item)}
                         >
-                          {platform === item ? (
-                            <motion.span
-                              layoutId="installPlatformPill"
-                              className="absolute inset-0 rounded bg-white/90 shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
-                              transition={{ duration: 0.3, ease: EASE_OUT }}
-                            />
-                          ) : null}
-                          <span className="relative">{t(`install.platforms.${item}`)}</span>
+                          {t(`install.platforms.${item}`)}
                         </button>
                       ))}
                     </motion.div>

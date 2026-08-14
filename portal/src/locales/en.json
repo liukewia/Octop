@@ -1,4 +1,7 @@
 {
+  "app": {
+    "pageTitle": "Octop - Born for Cloud, Knows You Better"
+  },
   "nav": {
     "overview": "Overview",
     "changelog": "Changelog",
