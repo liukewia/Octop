@@ -1,6 +1,6 @@
 {
   "app": {
-    "pageTitle": "Octop - Born for Cloud, Knows You Better"
+    "pageTitle": "Octop - Understands you, helps you, grows with you"
   },
   "nav": {
     "overview": "Overview",
@@ -143,7 +143,7 @@
     "button": "Get started"
   },
   "footer": {
-    "copyright": "Copyright © 2026 Octop. Produced by Tencent.",
+    "copyright": "Copyright © {{year}} Octop. Produced by Tencent.",
     "feedback": "Feedback",
     "channels": {
       "github": "GitHub",

@@ -1,6 +1,6 @@
 {
   "app": {
-    "pageTitle": "Octop - 生而为云，懂云更懂你！"
+    "pageTitle": "Octop - 懂你、帮你、陪你成长的智能伙伴"
   },
   "nav": {
     "overview": "概览",
@@ -143,7 +143,7 @@
     "button": "快速开始"
   },
   "footer": {
-    "copyright": "Copyright © 2026 Octop. 腾讯出品",
+    "copyright": "Copyright © {{year}} Octop. 腾讯出品",
     "feedback": "用户反馈",
     "channels": {
       "github": "GitHub",

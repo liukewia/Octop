@@ -52,7 +52,9 @@ export function FooterSection() {
       >
         <div className="flex items-center gap-4 max-[900px]:flex-col max-[900px]:items-start max-[900px]:gap-2">
           <img src={logoName} alt="Octop" className="w-[100px] shrink-0 object-contain" />
-          <p className="m-0 text-[13px] leading-5 text-[#999990]">{t("footer.copyright")}</p>
+          <p className="m-0 text-[13px] leading-5 text-[#999990]">
+            {t("footer.copyright", { year: new Date().getFullYear() })}
+          </p>
         </div>
 
         <div className="flex items-center gap-10">
