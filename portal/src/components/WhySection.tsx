@@ -5,23 +5,54 @@ import { useMediaQuery } from "@/hooks";
 import { cn } from "@/lib/utils";
 import { EASE_OUT, VIEWPORT_TALL, rise, staggerParent, zoomOut } from "@/motion";
 import featureAcp from "@/assets/landing/feature-acp.png";
+import featureAcpEn from "@/assets/landing/feature-acp-en.png";
 import featureCardBg1 from "@/assets/landing/feature-card-bg-1.png";
 import featureCardBg2 from "@/assets/landing/feature-card-bg-2.png";
 import featureCardBg3 from "@/assets/landing/feature-card-bg-3.png";
 import featureCardBg4 from "@/assets/landing/feature-card-bg-4.png";
 import featureCardBg5 from "@/assets/landing/feature-card-bg-5.png";
 import featureConnectors from "@/assets/landing/feature-connectors.png";
+import featureConnectorsEn from "@/assets/landing/feature-connectors-en.png";
 import featureDesktopPet from "@/assets/landing/feature-desktop-pet.png";
+import featureDesktopPetEn from "@/assets/landing/feature-desktop-pet-en.png";
 import featureExperts from "@/assets/landing/feature-experts.png";
+import featureExpertsEn from "@/assets/landing/feature-experts-en.png";
 import featureRemoteDesktop from "@/assets/landing/feature-remote-desktop.png";
+import featureRemoteDesktopEn from "@/assets/landing/feature-remote-desktop-en.png";
 import underlineWhy from "@/assets/landing/underline-why.svg";
+import { pickLocalizedAsset } from "@/utils/localePrefs";
 
 const BLOCKS = [
-  { id: "multi_user", image: featureExperts, bg: featureCardBg1 },
-  { id: "connectors", image: featureConnectors, bg: featureCardBg2 },
-  { id: "coding", image: featureAcp, bg: featureCardBg3 },
-  { id: "computer", image: featureRemoteDesktop, bg: featureCardBg4 },
-  { id: "desktop_pet", image: featureDesktopPet, bg: featureCardBg5 },
+  {
+    id: "multi_user",
+    imageZh: featureExperts,
+    imageEn: featureExpertsEn,
+    bg: featureCardBg1,
+  },
+  {
+    id: "connectors",
+    imageZh: featureConnectors,
+    imageEn: featureConnectorsEn,
+    bg: featureCardBg2,
+  },
+  {
+    id: "coding",
+    imageZh: featureAcp,
+    imageEn: featureAcpEn,
+    bg: featureCardBg3,
+  },
+  {
+    id: "computer",
+    imageZh: featureRemoteDesktop,
+    imageEn: featureRemoteDesktopEn,
+    bg: featureCardBg4,
+  },
+  {
+    id: "desktop_pet",
+    imageZh: featureDesktopPet,
+    imageEn: featureDesktopPetEn,
+    bg: featureCardBg5,
+  },
 ] as const;
 
 /** Narrow layout only: cards pin below the navbar and pile up, each one peeking out a bit further. */
@@ -44,7 +75,12 @@ function FeatureBlock({
   stackProgress: MotionValue<number>;
   onMount: (id: string, node: HTMLElement | null) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const image = pickLocalizedAsset(
+    block.imageZh,
+    block.imageEn,
+    i18n.resolvedLanguage ?? i18n.language,
+  );
   // How many cards will end up pinned on top of this one — the deeper it sits, the narrower it
   // settles, so the pinned stack reads as a deck instead of one flat card.
   const depth = BLOCKS.length - 1 - index;
@@ -109,7 +145,7 @@ function FeatureBlock({
         </div>
 
         <motion.img
-          src={block.image}
+          src={image}
           alt={t(`why.items.${block.id}.title`)}
           className="absolute top-[50px] left-[50px] h-auto w-[calc(100%+161px)] max-w-none rounded-landing-md shadow-[0_24px_50px_rgba(221,0,0,0.32)] max-[900px]:top-6 max-[900px]:left-6 max-[900px]:w-[calc(100%+80px)]"
           loading="lazy"

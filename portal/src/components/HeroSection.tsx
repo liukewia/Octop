@@ -5,10 +5,12 @@ import { ArrowRight, Bot, Check, Github, MousePointer2, ShieldCheck, Terminal } 
 import heroBgMp4 from "@/assets/landing/hero-bg.mp4";
 import heroBgWebp from "@/assets/landing/hero-bg.webp";
 import heroChat from "@/assets/landing/hero-chat.png";
+import heroChatEn from "@/assets/landing/hero-chat-en.png";
 import octopMascotType from "@/assets/landing/octop-mascot-type.webp";
-import { DOCS_URL, GITHUB_URL } from "@/constants/links";
+import { docsUrl, GITHUB_URL } from "@/constants/links";
 import { cn } from "@/lib/utils";
 import { EASE_OUT, hoverArrow, hoverLift, rise, staggerOnMount } from "@/motion";
+import { pickLocalizedAsset } from "@/utils/localePrefs";
 
 /** Real experts from Octop's bundled catalog; the first one matches the agent in the screenshot. */
 const ASSISTANTS = ["ops", "news", "parenting"] as const;
@@ -119,7 +121,10 @@ function LocalCard() {
 }
 
 export function HeroSection() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const locale = i18n.resolvedLanguage ?? i18n.language;
+  const heroChatSrc = pickLocalizedAsset(heroChat, heroChatEn, locale);
+  const heroDocsUrl = docsUrl(locale);
   const heroRef = useRef<HTMLElement>(null);
   const [videoReady, setVideoReady] = useState(false);
   const { scrollYProgress } = useScroll({
@@ -225,7 +230,7 @@ export function HeroSection() {
           </motion.a>
           <motion.a
             className="text-ink-secondary inline-flex h-[50px] items-center gap-2 rounded-landing-sm border border-line-subtle bg-white px-9 text-lg leading-[26px] font-medium whitespace-nowrap no-underline transition-colors duration-200 ease-out hover:bg-surface-subtle max-[900px]:h-12 max-[900px]:px-7 max-[900px]:text-base max-[600px]:h-10 max-[600px]:px-5 max-[600px]:text-sm"
-            href={DOCS_URL}
+            href={heroDocsUrl}
             target="_blank"
             rel="noopener noreferrer"
             {...hoverLift}
@@ -240,7 +245,7 @@ export function HeroSection() {
           ref={frameRef}
         >
           <motion.img
-            src={heroChat}
+            src={heroChatSrc}
             alt={t("hero.screenshot_alt")}
             className="block h-auto w-full rounded-t-landing-card"
             initial={{ opacity: 0, scale: 0.97, rotateX: 8 }}

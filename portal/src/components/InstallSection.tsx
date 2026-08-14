@@ -73,7 +73,10 @@ export function InstallSection() {
   const [method, setMethod] = useState<Method>("script");
   const [platform, setPlatform] = useState<Platform>("mac");
   const [copied, setCopied] = useState(false);
+  const [loadedBg, setLoadedBg] = useState<string | null>(null);
 
+  const bgSrc = INSTALL_BG[method];
+  const bgReady = loadedBg === bgSrc;
   const segments = method === "script" ? SCRIPT_COMMANDS[platform] : OTHER_COMMANDS[method];
   const command = segments.map((segment) => segment.text).join("");
 
@@ -148,28 +151,35 @@ export function InstallSection() {
             ))}
           </div>
 
-          <div className="relative flex items-start gap-3 px-[60px] py-14 max-[900px]:px-8 max-[900px]:py-10 max-[600px]:gap-2 max-[600px]:px-4 max-[600px]:py-6">
+          <div className="relative flex items-start gap-3 px-[60px] py-14 max-[900px]:px-8 max-[900px]:py-10 max-[600px]:px-4 max-[600px]:py-6">
             <div className="pointer-events-none absolute inset-0 select-none" aria-hidden="true">
               <AnimatePresence initial={false}>
                 <motion.img
                   key={method}
-                  src={INSTALL_BG[method]}
+                  src={bgSrc}
                   alt=""
                   className="absolute inset-0 size-full object-cover object-bottom"
                   initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
+                  animate={{ opacity: bgReady ? 1 : 0 }}
                   exit={{ opacity: 0 }}
-                  transition={{ duration: 0.4, ease: EASE_OUT }}
+                  transition={{ duration: 0.45, ease: EASE_OUT }}
+                  onLoad={() => setLoadedBg(bgSrc)}
+                  ref={(node) => {
+                    // Cached images may already be complete before onLoad is attached.
+                    if (node?.complete && node.naturalWidth > 0) setLoadedBg(bgSrc);
+                  }}
                 />
               </AnimatePresence>
               {/* Fade the gradient out toward the top-left so the orange stays a corner accent. */}
               <span className="absolute inset-0 bg-[linear-gradient(to_bottom_right,#fff_18%,rgb(255_255_255_/_72%)_46%,rgb(255_255_255_/_0%)_88%)]" />
             </div>
 
+            {/* Pulled into the row's left padding so the white card keeps the same 60px gutter on
+                both sides; hidden once the padding is too narrow to host the avatar. */}
             <img
               src={octopHi}
               alt=""
-              className="relative size-9 shrink-0 rounded-full object-contain max-[600px]:hidden"
+              className="relative -ml-12 size-9 shrink-0 rounded-full object-contain max-[900px]:hidden"
             />
 
             <div className="relative flex min-w-0 flex-1 flex-col items-center rounded-landing-card bg-white px-12 py-12 shadow-[0_12px_40px_rgba(0,0,0,0.06)] max-[900px]:px-8 max-[600px]:px-4 max-[600px]:py-6">

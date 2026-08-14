@@ -4,10 +4,12 @@ import { useTranslation } from "react-i18next";
 import { ChevronDown, Download, Monitor } from "lucide-react";
 import appleIcon from "@/assets/landing/apple.svg";
 import sectionDesktopPet from "@/assets/landing/section-desktop-pet.png";
+import sectionDesktopPetEn from "@/assets/landing/section-desktop-pet-en.png";
 import underlineInstall from "@/assets/landing/underline-install.svg";
 import { OCTOP_PET_RELEASES_URL } from "@/constants/links";
 import { cn } from "@/lib/utils";
 import { EASE_OUT, hoverLift, rise, staggerParent } from "@/motion";
+import { pickLocalizedAsset } from "@/utils/localePrefs";
 
 type PetPlatform = "mac_arm" | "mac_intel" | "win_x64" | "win_arm";
 
@@ -75,7 +77,12 @@ function detectPlatform(): PetPlatform | null {
 }
 
 export function PetSection() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const petImage = pickLocalizedAsset(
+    sectionDesktopPet,
+    sectionDesktopPetEn,
+    i18n.resolvedLanguage ?? i18n.language,
+  );
   const [detected, setDetected] = useState<PetPlatform | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuOffset, setMenuOffset] = useState(0);
@@ -133,7 +140,7 @@ export function PetSection() {
     <section className="pt-[200px] max-[900px]:pt-24" id="pet">
       <div className="page-container grid grid-cols-[minmax(0,859px)_465px] justify-between gap-[60px] max-[1280px]:grid-cols-[minmax(0,1fr)] max-[1280px]:gap-10">
         <motion.img
-          src={sectionDesktopPet}
+          src={petImage}
           alt={t("pet.title")}
           className="block h-auto w-full min-w-0 rounded-landing-md border border-line-subtle bg-surface-subtle"
           loading="lazy"

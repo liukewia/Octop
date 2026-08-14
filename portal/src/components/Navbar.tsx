@@ -6,18 +6,17 @@ import { changeLocale } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { readStoredUiLocale, type UiLocale } from "@/utils/localePrefs";
 import logoName from "@/assets/landing/logo_name.png";
-import { CHANGELOG_URL, DOCS_URL } from "@/constants/links";
+import { CHANGELOG_URL, docsUrl } from "@/constants/links";
 import { EASE_OUT } from "@/motion";
-
-const NAV_LINKS = [
-  { key: "overview", href: "#overview" },
-  { key: "changelog", href: CHANGELOG_URL },
-  { key: "docs", href: DOCS_URL },
-] as const;
 
 export function Navbar() {
   const { t, i18n } = useTranslation();
   const [scrolled, setScrolled] = useState(false);
+  const navLinks = [
+    { key: "overview", href: "#overview" },
+    { key: "changelog", href: CHANGELOG_URL },
+    { key: "docs", href: docsUrl(i18n.resolvedLanguage ?? i18n.language) },
+  ] as const;
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -54,7 +53,7 @@ export function Navbar() {
         </motion.a>
 
         <div className="absolute top-1/2 left-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-8 max-[900px]:hidden">
-          {NAV_LINKS.map((link, index) => (
+          {navLinks.map((link, index) => (
             <motion.a
               key={link.key}
               className="text-ink-secondary text-sm leading-[22px] font-medium no-underline transition-colors duration-200 ease-out hover:text-ink"

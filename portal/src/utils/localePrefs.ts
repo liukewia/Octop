@@ -56,3 +56,8 @@ export function syncDocumentLang(locale: UiLocale): void {
   if (typeof document === "undefined") return;
   document.documentElement.lang = locale === "zh" ? "zh-CN" : "en";
 }
+
+/** Landing screenshots with UI copy: default (zh) vs `*-en.png` for English. */
+export function pickLocalizedAsset(zhSrc: string, enSrc: string, locale: string): string {
+  return normalizeUiLocale(locale) === "en" ? enSrc : zhSrc;
+}
