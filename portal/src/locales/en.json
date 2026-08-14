@@ -1,4 +1,7 @@
 {
+  "app": {
+    "pageTitle": "Octop - An AI partner that grows with you"
+  },
   "nav": {
     "overview": "Overview",
     "changelog": "Changelog",

@@ -1,4 +1,7 @@
 {
+  "app": {
+    "pageTitle": "Octop - 陪你成长的智能伙伴"
+  },
   "nav": {
     "overview": "概览",
     "changelog": "更新日志",
