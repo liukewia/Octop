@@ -176,12 +176,6 @@ export function WhySection() {
                 />
               </span>
             </motion.h2>
-            <motion.p
-              className="text-ink-faint mt-7 text-lg leading-[26px] max-[600px]:text-[15px] max-[600px]:leading-6"
-              variants={rise}
-            >
-              {t("why.desc")}
-            </motion.p>
 
             <motion.nav
               className="mt-[76px] flex flex-col items-start gap-9 border-l-[3px] border-transparent pl-5 max-[1280px]:hidden"

@@ -2,7 +2,9 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useTranslation } from "react-i18next";
 import { Check, Copy } from "lucide-react";
-import installBg from "@/assets/landing/hero-bg.webp";
+import installBg1 from "@/assets/landing/hero-bg.webp";
+import installBg2 from "@/assets/landing/install-bg-2.png";
+import installBg3 from "@/assets/landing/install-bg-3.png";
 import octopHi from "@/assets/landing/octop-hi.png";
 import octopusType from "@/assets/landing/octopus-type.png";
 import underlineInstall from "@/assets/landing/underline-install.svg";
@@ -15,6 +17,12 @@ type Segment = { text: string; tone?: "flag" | "path" | "exec" };
 
 const METHODS: Method[] = ["script", "pip", "docker"];
 const PLATFORMS: Platform[] = ["mac", "win_ps", "win_cmd"];
+
+const INSTALL_BG: Record<Method, string> = {
+  script: installBg1,
+  pip: installBg2,
+  docker: installBg3,
+};
 
 const RELEASE_BASE = "https://finnie-1258344699.cos.ap-guangzhou.myqcloud.com/octop";
 
@@ -142,7 +150,18 @@ export function InstallSection() {
 
           <div className="relative flex items-start gap-3 px-[60px] py-14 max-[900px]:px-8 max-[900px]:py-10 max-[600px]:gap-2 max-[600px]:px-4 max-[600px]:py-6">
             <div className="pointer-events-none absolute inset-0 select-none" aria-hidden="true">
-              <img src={installBg} alt="" className="size-full object-cover object-bottom" />
+              <AnimatePresence initial={false}>
+                <motion.img
+                  key={method}
+                  src={INSTALL_BG[method]}
+                  alt=""
+                  className="absolute inset-0 size-full object-cover object-bottom"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.4, ease: EASE_OUT }}
+                />
+              </AnimatePresence>
               {/* Fade the gradient out toward the top-left so the orange stays a corner accent. */}
               <span className="absolute inset-0 bg-[linear-gradient(to_bottom_right,#fff_18%,rgb(255_255_255_/_72%)_46%,rgb(255_255_255_/_0%)_88%)]" />
             </div>
