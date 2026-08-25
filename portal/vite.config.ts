@@ -9,7 +9,7 @@ export default defineConfig(({ mode }) => {
   const devServerPort = Number(env.VITE_DEV_PORT || 5174);
 
   return {
-    base: "/",
+    base: "/Octop/",
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
