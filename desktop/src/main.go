@@ -176,6 +176,9 @@ func (a *App) boot() {
 		a.setStatus(err.Error())
 		return
 	}
+	if err := installOctopCLI(); err != nil {
+		log.Printf("install octop CLI: %v", err)
+	}
 	root := portableDir()
 	a.mu.Lock()
 	stopOctop(a.cmd)

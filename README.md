@@ -217,7 +217,7 @@ See [scripts/README.md](scripts/README.md) for all install options (`--version`,
 | Linux | `Octop-desktop-linux-amd64-<version>.tar.gz` / `Octop-desktop-linux-arm64-<version>.tar.gz` |
 | FnOS NAS | `Octop-fnos-docker-<version>.fpk` (Docker-backed) / `Octop-fnos-native-<version>.fpk` (no Docker) — install via App Center |
 
-See [desktop/README.md](desktop/README.md) for the desktop shell and [fnos/README.md](fnos/README.md) for the FnOS packaging guide.
+See [desktop/README.md](desktop/README.md) for the desktop shell and [fnos/README.md](fnos/README.md) for the FnOS packaging guide. After install or first launch, `octop` is available in a new terminal (`~/.octop/bin` on PATH). The green portable zip does not modify PATH.
 
 **Alternative — PyPI** (if you already manage Python yourself):
 

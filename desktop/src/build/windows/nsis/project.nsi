@@ -23,6 +23,12 @@ VIAddVersionKey "ProductName"     "${INFO_PRODUCTNAME}"
 ManifestDPIAware true
 
 !include "MUI.nsh"
+!include "WinMessages.nsh"
+!include "LogicLib.nsh"
+!include "StrFunc.nsh"
+${StrStr}
+${StrRep}
+${UnStrRep}
 
 !define MUI_ICON "..\icon.ico"
 !define MUI_UNICON "..\icon.ico"
@@ -69,6 +75,12 @@ Section
 
     !insertmacro wails.files
 
+    File "/oname=octop.cmd" "..\..\..\cliembed\octop.cmd"
+    CreateDirectory "$PROFILE\.octop\bin"
+    CopyFiles /SILENT "$INSTDIR\octop.cmd" "$PROFILE\.octop\bin\octop.cmd"
+    Push "$PROFILE\.octop\bin"
+    Call AddToUserPath
+
     CreateShortcut "$SMPROGRAMS\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"
     CreateShortcut "$DESKTOP\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"
 
@@ -87,9 +99,49 @@ Section "uninstall"
 
     Delete "$SMPROGRAMS\${INFO_PRODUCTNAME}.lnk"
     Delete "$DESKTOP\${INFO_PRODUCTNAME}.lnk"
+    Delete "$PROFILE\.octop\bin\octop.cmd"
+    Push "$PROFILE\.octop\bin"
+    Call un.RemoveFromUserPath
 
     !insertmacro wails.unassociateFiles
     !insertmacro wails.unassociateCustomProtocols
 
     !insertmacro wails.deleteUninstaller
 SectionEnd
+
+Function AddToUserPath
+    Exch $0
+    Push $1
+    Push $2
+    ReadRegStr $1 HKCU "Environment" "Path"
+    ${StrStr} $2 ";$1;" ";$0;"
+    ${If} $2 != ""
+        Goto add_to_path_done
+    ${EndIf}
+    ${If} $1 == ""
+        StrCpy $1 "$0"
+    ${Else}
+        StrCpy $1 "$0;$1"
+    ${EndIf}
+    WriteRegExpandStr HKCU "Environment" "Path" "$1"
+    SendMessage ${HWND_BROADCAST} ${WM_WININICHANGE} 0 "STR:Environment" /TIMEOUT=5000
+    add_to_path_done:
+    Pop $2
+    Pop $1
+    Exch $0
+FunctionEnd
+
+Function un.RemoveFromUserPath
+    Exch $0
+    Push $1
+    Push $2
+    ReadRegStr $1 HKCU "Environment" "Path"
+    ${UnStrRep} $2 "$1" "$0;" ""
+    ${UnStrRep} $2 "$2" ";$0" ""
+    ${UnStrRep} $2 "$2" "$0" ""
+    WriteRegExpandStr HKCU "Environment" "Path" "$2"
+    SendMessage ${HWND_BROADCAST} ${WM_WININICHANGE} 0 "STR:Environment" /TIMEOUT=5000
+    Pop $2
+    Pop $1
+    Exch $0
+FunctionEnd

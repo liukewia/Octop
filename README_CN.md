@@ -217,7 +217,7 @@ curl -fsSL https://finnie-1258344699.cos.ap-guangzhou.myqcloud.com/octop/install
 | Linux | `Octop-desktop-linux-amd64-<version>.tar.gz` / `Octop-desktop-linux-arm64-<version>.tar.gz` |
 | 飞牛 NAS（FnOS） | `Octop-fnos-docker-<version>.fpk`（依赖 Docker）/ `Octop-fnos-native-<version>.fpk`（无需 Docker）— 通过应用中心安装 |
 
-桌面客户端说明见 [desktop/README.md](desktop/README.md)，飞牛打包指南见 [fnos/README.md](fnos/README.md)。
+桌面客户端说明见 [desktop/README.md](desktop/README.md)，飞牛打包指南见 [fnos/README.md](fnos/README.md)。安装或首次启动后，可在新终端使用 `octop`（写入 `~/.octop/bin` 并加入 PATH）。绿色便携包不会改 PATH。
 
 **备选 — PyPI**（若你已自行管理 Python 环境）：
 

@@ -84,8 +84,11 @@ GitHub Release names follow `Octop-<kind>-<os>-<arch>-<version>.<ext>`:
 
 - Desktop GUI: `Octop-desktop-<plat>-<version>.dmg` (macOS; open and drag
   `Octop.app` into Applications), `.exe` (Windows NSIS installer — copies
-  into `Program Files\Octop` and creates Start Menu + desktop shortcuts),
-  `.tar.gz` (Linux)
+  into `Program Files\Octop`, creates Start Menu + desktop shortcuts, and
+  puts `octop.cmd` on the user PATH),
+  `.tar.gz` (Linux). First launch also installs `~/.octop/bin/octop` (or
+  `octop.cmd`) so a new terminal can run `octop`. The green portable zip
+  does not modify PATH.
 - Green runtime zip: `Octop-portable-<plat>-<version>.zip`
 - PyPI wheels stay `octop-<version>-py3-none-any.whl` (PEP 427)
 
