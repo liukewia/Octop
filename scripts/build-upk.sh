@@ -101,7 +101,7 @@ resolve_ugcli() {
     done
   fi
   url="$(ugcli_url "$ver")"
-  echo "[build-upk] 下载 ugcli $ver: $url"
+  echo "[build-upk] 下载 ugcli $ver: $url" >&2
   curl -fL --retry 3 -o "$dest" "$url"
   chmod +x "$dest"
   if ! python3 -c 'import sys; p=sys.argv[1]; d=open(p,"rb").read(4); sys.exit(0 if d==b"\x7fELF" else 1)' "$dest"; then

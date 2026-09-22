@@ -63,6 +63,21 @@ bash scripts/build-upk.sh
 
 `.tar` 与 `build_dir/` 已加入 `.gitignore`。
 
+## 自动发版
+
+正式发布的自动链路：
+
+1. `v*` tag 触发 `.github/workflows/release.yml` 与 `docker-publish.yml`
+2. Release 创建成功后，`release.yml` 按该 tag dispatch
+   `.github/workflows/ugos-build-upk.yml`
+3. UPK workflow 等待 `ghcr.io/tencentcloud/octop:<version>` 可用
+4. 执行 `bash scripts/build-upk.sh`，不重新构建 Docker 镜像
+5. 将 `Octop-ugos-amd64-<version>.upk` 上传为对应 GitHub Release asset，
+   同时保留为 Actions artifact
+
+也可在 GitHub Actions 中对 **`v*` tag** 手动运行 `Build Octop UPK`。
+workflow 会拒绝分支 ref 或与 `pyproject.toml` 版本不一致的 tag。
+
 ## 在绿联 NAS 上安装
 
 1. 设备需已安装 Docker 套件（`com.ugreen.docker` ≥ `1.7.0.0000`），固件 ≥ `1.13.0.0000`

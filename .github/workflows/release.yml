@@ -3,6 +3,7 @@ name: Release
 # 版本标签 v* → 测包、发 PyPI、建 GitHub Release，再级联：
 #   - Sync Main Into Develop
 #   - Build Octop FPK（复用本 Release 的 wheel；等待 docker-publish 的 GHCR 镜像）
+#   - Build Octop UPK（复用 docker-publish 的 GHCR 镜像）
 #
 # 与 docker-publish.yml / octop-desktop.yml 并行（由 Auto Tag 同时 dispatch，
 # 或人工 push v* tag 同时触发）。桌面产物由 Desktop Package 挂到同一 GitHub Release。
@@ -166,5 +167,20 @@ jobs:
         run: |
           # --ref 用版本 tag，保证 FPK 打在与 PyPI / 镜像相同的 commit 上
           gh workflow run fnos-build-fpk.yml \
+            --repo "${{ github.repository }}" \
+            --ref "${{ github.ref_name }}"
+
+  # 绿联 UGOS Pro UPK：复用 docker-publish 推送的版本镜像，不重新构建镜像。
+  # 与 FnOS / develop 同步并行；workflow 负责等待镜像并将 UPK 附加到本 Release。
+  trigger-ugos:
+    name: Trigger UGOS Pro UPK build
+    needs: github-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch Build Octop UPK
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run ugos-build-upk.yml \
             --repo "${{ github.repository }}" \
             --ref "${{ github.ref_name }}"
