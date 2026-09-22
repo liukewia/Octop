@@ -1,0 +1,105 @@
+# UGOS Pro Docker app metadata for Octop.
+# spec: https://developer.ugnas.com/doc/tools/project-yaml.html
+# version is overwritten by scripts/build-upk.sh from pyproject.toml.
+spec_version: "2.1"
+app_id: com.tencentcloud.docker.octop
+version: 1.0.1
+support_arch:
+  - amd64
+product_series:
+  - nasync
+supports:
+  - app
+  - pc
+is_docker_app: true
+only_admin: true
+port: 8088
+open_type: tab
+tag_types:
+  - utility
+  - devtool
+depend_fw_version: 1.13.0.0000
+depend_docker_version: 1.7.0.0000
+support_migration: false
+allow_add_access_path: false
+permissions:
+  - NETWORK.ACCESS_INTERNET
+license_agreement_link:
+  - https://github.com/TencentCloud/Octop/blob/main/LICENSE
+source_code_link:
+  - https://github.com/TencentCloud/Octop
+technical_support_link:
+  - https://github.com/TencentCloud/Octop/issues
+parameters:
+  - key: OCTOP_ADMIN_USERNAME
+    type: string
+    required: false
+    changeable: true
+    i18n:
+      en-US:
+        name: Admin username
+        description: First-boot admin username. Leave empty to use admin.
+      zh-CN:
+        name: 管理员用户名
+        description: 首次初始化管理员用户名。留空则使用 admin。
+  - key: OCTOP_DEFAULT_PASSWORD
+    type: password
+    required: false
+    changeable: true
+    i18n:
+      en-US:
+        name: Admin password
+        description: First-boot password (8+ chars, letters and digits). Leave empty to auto-generate; see credential.txt in the data volume.
+      zh-CN:
+        name: 管理员密码
+        description: 首次初始化密码（至少 8 位，需同时包含字母和数字）。留空则自动生成，见数据目录 credential.txt。
+  - key: OCTOP_LOG_LEVEL
+    type: string
+    required: false
+    changeable: true
+    i18n:
+      en-US:
+        name: Log level
+        description: Container log level, e.g. info or debug.
+      zh-CN:
+        name: 日志级别
+        description: 容器日志级别，例如 info 或 debug。
+  - key: OPENAI_API_KEY
+    type: password
+    required: false
+    changeable: true
+    i18n:
+      en-US:
+        name: OpenAI API key
+        description: Optional. Can also be set later in the web console.
+      zh-CN:
+        name: OpenAI API Key
+        description: 可选。也可安装后在 Web 控制台配置。
+  - key: DASHSCOPE_API_KEY
+    type: password
+    required: false
+    changeable: true
+    i18n:
+      en-US:
+        name: DashScope API key
+        description: Optional Alibaba DashScope / Qwen key.
+      zh-CN:
+        name: 通义千问 API Key
+        description: 可选。阿里云 DashScope / 通义千问密钥。
+i18n:
+  en-US:
+    name: Octop
+    description: Self-hosted multi-user, multi-agent AI assistant. Opens a web console on port 8088. Reuses the published ghcr.io/tencentcloud/octop image.
+    author: TencentCloud OrcaKit
+    official: https://github.com/TencentCloud/Octop
+    help: https://github.com/TencentCloud/Octop/blob/main/docs/user-guide.md
+    publisher: TencentCloud
+    publisher_link: https://github.com/TencentCloud/Octop
+  zh-CN:
+    name: Octop
+    description: 自托管多用户多智能体 AI 助手。安装后在 8088 端口打开 Web 控制台。复用已发布的 ghcr.io/tencentcloud/octop 镜像，不另做镜像。
+    author: TencentCloud OrcaKit
+    official: https://github.com/TencentCloud/Octop
+    help: https://github.com/TencentCloud/Octop/blob/main/docs/user-guide.md
+    publisher: TencentCloud
+    publisher_link: https://github.com/TencentCloud/Octop

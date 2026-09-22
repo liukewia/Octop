@@ -216,8 +216,9 @@ See [scripts/README.md](scripts/README.md) for all install options (`--version`,
 | macOS | `Octop-desktop-darwin-arm64-<version>.dmg` (Apple Silicon) / `Octop-desktop-darwin-amd64-<version>.dmg` (Intel) |
 | Linux | `Octop-desktop-linux-amd64-<version>.tar.gz` / `Octop-desktop-linux-arm64-<version>.tar.gz` |
 | FnOS NAS | `Octop-fnos-docker-<version>.fpk` (Docker-backed) / `Octop-fnos-native-<version>.fpk` (no Docker) — install via App Center |
+| UGREEN NAS (UGOS Pro) | `Octop-ugos-amd64-<version>.upk` (Docker app, amd64) — see [`ugos/README.md`](ugos/README.md) |
 
-See [desktop/README.md](desktop/README.md) for the desktop shell and [fnos/README.md](fnos/README.md) for the FnOS packaging guide.
+See [desktop/README.md](desktop/README.md) for the desktop shell, [fnos/README.md](fnos/README.md) for FnOS packaging, and [ugos/README.md](ugos/README.md) for UGOS Pro UPK packaging.
 
 **Alternative — PyPI** (if you already manage Python yourself):
 

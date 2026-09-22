@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+### 新增
+
+- 绿联 UGOS Pro Docker 应用打包（`ugos/`，`scripts/build-upk.sh`），复用已发布的 `ghcr.io/tencentcloud/octop` 镜像
+
 ## [1.0.1] - 2026-09-18
 
 ### 新增
