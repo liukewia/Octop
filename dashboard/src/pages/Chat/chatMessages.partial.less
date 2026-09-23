@@ -1323,12 +1323,17 @@
 }
 
 .msgMetaRow {
-  display: flex;
+  /* Keep auxiliary details attached to the message they describe.  A block
+     flex container stretches across the whole chat column, which makes a
+     short reply look as though its timestamp and usage were detached from it. */
+  display: inline-flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  margin-top: 6px;
-  padding: 0 4px;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 4px;
+  padding: 0;
   opacity: 0.5;
   font-size: 10px;
   transition: opacity 0.2s;
@@ -1341,6 +1346,7 @@
 .msgMetaRowRight {
   justify-content: flex-end;
   flex-wrap: nowrap;
+  margin-left: auto;
 }
 
 .msgUsage {
