@@ -6,7 +6,7 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content"
     />
     <!-- PWA: theme color (light / dark) -->
     <meta
@@ -30,6 +30,24 @@
     <!-- Web App Manifest -->
     <link rel="manifest" href="/manifest.json" />
     <title>Octop</title>
+    <!--
+      Mark installed/standalone display before first paint so layout.css can
+      keep PWA on 100lvh (paint under home indicator) while browser tabs use
+      100dvh (stay above Safari/Chrome toolbars).
+    -->
+    <script id="octop-boot-pwa">
+      (function () {
+        try {
+          var standalone =
+            window.matchMedia("(display-mode: standalone)").matches ||
+            window.matchMedia("(display-mode: fullscreen)").matches ||
+            window.navigator.standalone === true;
+          if (standalone) {
+            document.documentElement.classList.add("octop-pwa");
+          }
+        } catch (e) {}
+      })();
+    </script>
     <!--
       Resolve dashboard theme before first paint. Must stay a classic script:
       the splash CSS keys off html[data-theme], not prefers-color-scheme,
@@ -91,6 +109,9 @@
       }
       #root {
         min-height: 100%;
+        min-height: 100dvh;
+      }
+      html.octop-pwa #root {
         min-height: 100lvh;
       }
       #octop-boot {

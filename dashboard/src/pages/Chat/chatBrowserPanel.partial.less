@@ -16,10 +16,18 @@
     overflow: hidden;
   }
 
-  /* Reduce input padding to save vertical space */
+  /* Reduce input padding to save vertical space, but keep safe-area /
+     keyboard clearance so mobile composers stay above system chrome. */
   .chatInput {
     padding-top: 6px;
     padding-bottom: 10px;
+
+    @media (max-width: 767px) {
+      padding-bottom: calc(
+        10px +
+          max(env(safe-area-inset-bottom, 0px), var(--keyboard-offset, 0px))
+      );
+    }
   }
 }
 
@@ -34,6 +42,13 @@
   .chatInput {
     padding-top: 6px;
     padding-bottom: 10px;
+
+    @media (max-width: 767px) {
+      padding-bottom: calc(
+        10px +
+          max(env(safe-area-inset-bottom, 0px), var(--keyboard-offset, 0px))
+      );
+    }
   }
 }
 

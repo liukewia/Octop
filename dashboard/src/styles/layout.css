@@ -1,10 +1,10 @@
 html,
 body {
-  /* lvh = largest viewport (behind the home indicator). dvh stops short. */
+  /* Browser: dynamic viewport stays above Safari/Chrome toolbars.
+     PWA (html.octop-pwa): largest viewport paints under the home indicator. */
   height: 100%;
-  height: 100lvh;
-  min-height: 100lvh;
-  min-height: -webkit-fill-available;
+  height: 100dvh;
+  min-height: 100dvh;
   overflow: hidden;
   margin: 0;
   padding: 0;
@@ -17,6 +17,13 @@ body {
   /* Override index.html boot gray (#f7f8fa) so iOS PWA letterboxing
      below 100dvh is not a stray gray strip. */
   background: var(--fn-bg-layout, #f5f6f8);
+}
+
+html.octop-pwa,
+html.octop-pwa body {
+  height: 100lvh;
+  min-height: 100lvh;
+  min-height: -webkit-fill-available;
 }
 
 html {
@@ -66,14 +73,26 @@ html[data-octop-desktop-chrome] .ant-drawer-right .ant-drawer-close {
 }
 
 #root {
-  /* Pin to the layout viewport. With viewport-fit=cover this includes
-     the iOS home-indicator band; 100dvh does not. */
   position: fixed;
   inset: 0;
   height: auto;
   width: auto;
   overflow: hidden;
   overscroll-behavior: none;
+}
+
+/* Non-PWA: pin to the dynamic viewport so the chat composer is not covered
+   by mobile browser chrome. PWA keeps inset:0 so the shell can paint under
+   the home indicator (composer uses safe-area / --keyboard-offset). */
+html:not(.octop-pwa) #root {
+  inset: auto;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: auto;
+  height: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
 }
 
 /* ConfigProvider prefixCls="octop" → antd <App> is .octop-app.
