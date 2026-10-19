@@ -7,6 +7,7 @@
 ## [Unreleased]
 
 ### 新增
+- 绿联 UGOS Pro Docker 应用打包（`ugos/`，`scripts/build-upk.sh`），复用已发布的 `ghcr.io/tencentcloud/octop` 镜像
 - 账号安全支持 TOTP 双因素与 Passkey（注册、登录二次验证、无密码登录）；可用恢复码；管理端可配置 WebAuthn RP；敏感操作需近期二次验证
 - 技能包支持「是否共享」：默认仅创建者可见，开启后其他用户可查看与挂载；创建时可同时设置复制策略与是否允许下载
 - 技能包查看/编辑技能时展示左侧文件树（与个性化技能一致），并支持预览同级文件
