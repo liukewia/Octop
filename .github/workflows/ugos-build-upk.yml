@@ -1,0 +1,125 @@
+name: Build Octop UPK
+
+# UGREEN UGOS Pro Docker app package pipeline.
+#
+# Triggered by release.yml after the v* GitHub Release exists. The workflow
+# reuses the versioned GHCR image published by docker-publish.yml; it never
+# rebuilds the Docker image.
+#
+# Can also be triggered via workflow_dispatch manually:
+#   gh workflow run ugos-build-upk.yml --repo <repo> -f version=1.0.2
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Octop version to package (default: from pyproject.toml)"
+        required: false
+        default: ""
+        type: string
+      image:
+        description: "Docker image repository (default: ghcr.io/tencentcloud/octop)"
+        required: false
+        default: "ghcr.io/tencentcloud/octop"
+        type: string
+      attach_release:
+        description: "Attach UPK to GitHub Release if exists"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  packages: read
+
+concurrency:
+  group: build-octop-upk-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  upk:
+    name: Build and attach amd64 UPK
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Resolve release version and image
+        id: release
+        run: |
+          set -euo pipefail
+          INPUT_VER="${{ github.event.inputs.version }}"
+          if [ -n "$INPUT_VER" ]; then
+            VER="$INPUT_VER"
+            TAG="v${VER}"
+          elif [[ "${GITHUB_REF_NAME}" =~ ^v[0-9] ]]; then
+            TAG="${GITHUB_REF_NAME}"
+            VER="${TAG#v}"
+          else
+            PROJECT_VER="$(grep -m1 '^version' pyproject.toml | sed -E 's/.*"([0-9][0-9.]*[0-9])".*/\1/')"
+            VER="$PROJECT_VER"
+            TAG="v${VER}"
+          fi
+          IMAGE="${{ github.event.inputs.image || 'ghcr.io/tencentcloud/octop' }}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+          echo "[resolve] VER=${VER}, TAG=${TAG}, IMAGE=${IMAGE}"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Wait for published Octop image
+        env:
+          IMAGE: ${{ steps.release.outputs.image }}
+          VER: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          TAG="${IMAGE}:${VER}"
+          echo "Waiting for ${TAG} from docker-publish.yml..."
+          for i in $(seq 1 90); do
+            if docker manifest inspect "$TAG" >/dev/null 2>&1; then
+              echo "Image ready: $TAG"
+              exit 0
+            fi
+            echo "[$i/90] image not ready yet"
+            sleep 20
+          done
+          echo "::error::Timed out waiting for ${TAG}."
+          exit 1
+
+      - name: Build UPK from published image
+        env:
+          OCTOP_VERSION: ${{ steps.release.outputs.version }}
+          OCTOP_UPK_IMAGE: ${{ steps.release.outputs.image }}
+          UGCLI_VERSION: 1.1.0.25
+          UPK_BUILD: 1
+        run: bash scripts/build-upk.sh
+
+      - name: Check and attach UPK to GitHub Release
+        if: ${{ github.event.inputs.attach_release == 'true' || startsWith(github.ref, 'refs/tags/v') }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "Release $TAG exists, uploading..."
+            gh release upload "$TAG" dist/Octop-ugos-amd64-*.upk --clobber --repo "${{ github.repository }}"
+          else
+            echo "Release $TAG does not exist on ${{ github.repository }}, skipping attach."
+          fi
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ugos-upk-${{ steps.release.outputs.version }}
+          path: dist/Octop-ugos-amd64-*.upk
+          if-no-files-found: error

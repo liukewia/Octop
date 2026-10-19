@@ -1,0 +1,22 @@
+# Image tag is overwritten by scripts/build-upk.sh from pyproject.toml.
+# Must match the tag inside rootfs_amd64/images/*.tar; must not be latest.
+services:
+  octop:
+    image: ghcr.io/tencentcloud/octop:1.0.1
+    container_name: octop
+    restart: always
+    network_mode: bridge
+    ports:
+      - 8088:8088
+    volumes:
+      - ./data:/data/.octop
+    environment:
+      - HOME=/data
+      - TZ=${TZ}
+      - OCTOP_BIND_HOST=0.0.0.0
+      - OCTOP_PORT=8088
+      - OCTOP_LOG_LEVEL=${OCTOP_LOG_LEVEL}
+      - OCTOP_DEFAULT_PASSWORD=${OCTOP_DEFAULT_PASSWORD}
+      - OCTOP_ADMIN_USERNAME=${OCTOP_ADMIN_USERNAME}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}

@@ -110,6 +110,11 @@ scripts/dev-local-link.sh
 # FnOS native FPK install target (CI / local pack scratch; do not vendor)
 fnos/native/app/site-packages/
 
+# UGOS Pro UPK packer + image tarballs (scripts/build-upk.sh)
+.verify/ugcli
+ugos/build_dir/
+ugos/rootfs_amd64/images/*.tar
+
 # Local agent planning docs (not for upstream)
 docs/superpowers/
 scripts/lh_image_install_octop_tencentos.sh
