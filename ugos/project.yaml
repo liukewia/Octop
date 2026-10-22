@@ -64,17 +64,6 @@ parameters:
       zh-CN:
         name: 显示名称
         description: 可选。仅在首次创建管理员时写入。
-  - key: OCTOP_LOG_LEVEL
-    type: string
-    required: false
-    changeable: true
-    i18n:
-      en-US:
-        name: Log level
-        description: Optional. info or debug. Takes effect after restart.
-      zh-CN:
-        name: 日志级别
-        description: 可选。例如 info 或 debug。修改后需重启应用。
 i18n:
   en-US:
     name: Octop
