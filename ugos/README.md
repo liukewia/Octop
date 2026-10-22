@@ -82,8 +82,8 @@ workflow 会拒绝分支 ref 或与 `pyproject.toml` 版本不一致的 tag。
 
 1. 设备需已安装 Docker 套件（`com.ugreen.docker` ≥ `1.7.0.0000`），固件 ≥ `1.13.0.0000`
 2. **侧载测试**需向绿联申请开发者授权（`ugdev.sig`），见 [开发准备](https://developer.ugnas.com/doc/backend/quick-start/prepare.html)
-3. 应用中心 → 手动安装，选择 amd64 / nasync 的 `.upk`
-4. 浏览器打开 `http://<设备IP>:8088`。未设密码时见数据卷 `credential.txt`
+3. 应用中心 → 手动安装，选择 amd64 / nasync 的 `.upk`。安装时填写管理员用户名和密码（必填）；显示名称和日志级别可选
+4. 浏览器打开 `http://<设备IP>:8088`，用刚才的账号登录。密码未通过策略（至少 8 位且同时含字母和数字）时不会建号，打开页面走设置向导，向导口令在数据卷 `octop-login.txt`
 
 ## 限制
 

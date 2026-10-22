@@ -33,26 +33,37 @@ technical_support_link:
 parameters:
   - key: OCTOP_ADMIN_USERNAME
     type: string
-    required: false
-    changeable: true
+    required: true
+    changeable: false
     i18n:
       en-US:
         name: Admin username
-        description: First-boot admin username. Leave empty to use admin.
+        description: 2-32 characters. Letters, digits, dot, underscore, hyphen. Used only on first start.
       zh-CN:
         name: 管理员用户名
-        description: 首次初始化管理员用户名。留空则使用 admin。
+        description: 2-32 位，只能含字母、数字、点、下划线和连字符。仅首次启动时创建账号。
   - key: OCTOP_DEFAULT_PASSWORD
     type: password
-    required: false
-    changeable: true
+    required: true
+    changeable: false
     i18n:
       en-US:
         name: Admin password
-        description: First-boot password (8+ chars, letters and digits). Leave empty to auto-generate; see credential.txt in the data volume.
+        description: At least 8 characters, with both letters and digits. A rejected password does not block install; the web setup wizard opens instead.
       zh-CN:
         name: 管理员密码
-        description: 首次初始化密码（至少 8 位，需同时包含字母和数字）。留空则自动生成，见数据目录 credential.txt。
+        description: 至少 8 位，且必须同时包含字母和数字。平台不校验格式；不合格时安装仍会完成，打开网页会进入设置向导。
+  - key: OCTOP_ADMIN_DISPLAY_NAME
+    type: string
+    required: false
+    changeable: false
+    i18n:
+      en-US:
+        name: Display name
+        description: Optional. Applied only when the admin account is created.
+      zh-CN:
+        name: 显示名称
+        description: 可选。仅在首次创建管理员时写入。
   - key: OCTOP_LOG_LEVEL
     type: string
     required: false
@@ -60,32 +71,10 @@ parameters:
     i18n:
       en-US:
         name: Log level
-        description: Container log level, e.g. info or debug.
+        description: Optional. info or debug. Takes effect after restart.
       zh-CN:
         name: 日志级别
-        description: 容器日志级别，例如 info 或 debug。
-  - key: OPENAI_API_KEY
-    type: password
-    required: false
-    changeable: true
-    i18n:
-      en-US:
-        name: OpenAI API key
-        description: Optional. Can also be set later in the web console.
-      zh-CN:
-        name: OpenAI API Key
-        description: 可选。也可安装后在 Web 控制台配置。
-  - key: DASHSCOPE_API_KEY
-    type: password
-    required: false
-    changeable: true
-    i18n:
-      en-US:
-        name: DashScope API key
-        description: Optional Alibaba DashScope / Qwen key.
-      zh-CN:
-        name: 通义千问 API Key
-        description: 可选。阿里云 DashScope / 通义千问密钥。
+        description: 可选。例如 info 或 debug。修改后需重启应用。
 i18n:
   en-US:
     name: Octop
