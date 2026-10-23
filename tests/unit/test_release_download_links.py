@@ -39,7 +39,7 @@ def test_render_download_section_matches_github_asset_names() -> None:
     assert f"{base}/Octop-portable-linux-amd64-0.9.31.zip" in body
     assert f"{base}/Octop-portable-linux-arm64-0.9.31.zip" in body
     assert f"{base}/Octop-fnos-docker-0.9.31.fpk" in body
-    assert f"{base}/Octop-fnos-native-0.9.31.fpk" in body
+    assert f"{base}/Octop-fnos-native-amd64-0.9.31.fpk" in body
     assert f"{base}/Octop-fnos-native-arm64-0.9.31.fpk" in body
     assert "Docker (recommended; x86 and ARM)" in body
     assert "Native x86_64" in body

@@ -58,7 +58,7 @@ def render_download_section(raw_version: str) -> str:
     fnos_docker = md_link(
         "Docker (recommended; x86 and ARM)", tag, f"Octop-fnos-docker-{version}.fpk"
     )
-    fnos_native = md_link("Native x86_64", tag, f"Octop-fnos-native-{version}.fpk")
+    fnos_native = md_link("Native x86_64", tag, f"Octop-fnos-native-amd64-{version}.fpk")
     fnos_native_arm = md_link(
         "Native ARM64 (no Docker)", tag, f"Octop-fnos-native-arm64-{version}.fpk"
     )
