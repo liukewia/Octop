@@ -20,6 +20,10 @@ const artifactName = process.env.OCTOP_PLATFORM
   ? `Octop-desktop-${process.env.OCTOP_PLATFORM}-${productVersion}.\${ext}`
   : "Octop-desktop-${os}-${arch}-${version}.${ext}";
 
+// PACK-BRANCH PATCH (see the mac block): only set by the packaging workflow on
+// a throwaway branch, never by a release run.
+const skipSigning = process.env.OCTOP_SKIP_SIGN === "1";
+
 export default {
   extraMetadata: { version: electronVersion },
   artifactName,
@@ -38,8 +42,12 @@ export default {
     target: ["dmg", "zip"],
     category: "public.app-category.productivity",
     icon: "resources/icon.icns",
-    hardenedRuntime: true,
     gatekeeperAssess: false,
+    // PACK-BRANCH PATCH: with no certificate to sign with, electron-builder's
+    // own fallback aborts mid-pack ("…/desktop/src not a file") instead of
+    // skipping the signature. `identity: null` is the documented "do not sign"
+    // value, and hardened runtime is meaningless without a signature.
+    ...(skipSigning ? { identity: null, hardenedRuntime: false } : { hardenedRuntime: true }),
     // Signing/notarization are wired through CSC_LINK / APPLE_* env in CI, not here.
   },
   win: {

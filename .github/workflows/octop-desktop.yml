@@ -283,6 +283,7 @@ jobs:
           # resolve to a usable certificate, and electron-builder then aborts
           # with "…/desktop/src not a file" instead of skipping the signature.
           OCTOP_PLATFORM: ${{ matrix.plat }}
+          OCTOP_SKIP_SIGN: "1"
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
           CSC_LINK: ""
           CSC_KEY_PASSWORD: ""
