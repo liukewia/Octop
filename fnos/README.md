@@ -40,7 +40,7 @@ octop backup --help     # 备份/恢复
 - **Docker 版**实现为 FnOS `docker-project`：包体只含 `docker-compose.yaml` 与向导配置，运行时由飞牛从 GHCR 拉取镜像。x86 / ARM 飞牛共用这一份 FPK，Docker 按本机架构拉对应镜像层。ARM 飞牛优先用这一份。镜像已内置 `desktop` 桌面控制与前端；Playwright Chromium 不预装，可在控制台按需安装。
 - **本地版**实现为 FnOS 原生 `app`：解释器复用飞牛「Python 3.12」开发工具；包内是 Octop 核心依赖与前端。专家 shell / 技能若要跑 `node` / `npx`，会复用飞牛已装的 Node.js（不强制安装）。扩展里的 `.so` 与 CPU 架构绑定，因此 x86 与 ARM 各打一份；装错架构会在安装或启动时报错。
 
-> 上述包随正式版一起挂在 **`v*` GitHub Release** 上（例如 [v0.9.31](https://github.com/TencentCloud/Octop/releases/latest)）：`Octop-fnos-docker-<ver>.fpk` / `Octop-fnos-native-amd64-<ver>.fpk` / `Octop-fnos-native-arm64-<ver>.fpk`。
+> 上述包随正式版一起挂在 `v*` **GitHub Release** 上（例如 [v0.9.31](https://github.com/TencentCloud/Octop/releases/latest)）：`Octop-fnos-docker-<ver>.fpk` / `Octop-fnos-native-amd64-<ver>.fpk` / `Octop-fnos-native-arm64-<ver>.fpk`。
 
 ## 目录结构
 
@@ -80,12 +80,37 @@ fnos/
     └── wizard/             # 安装/配置/卸载/升级向导
 ```
 
+## 版本号映射
+
+飞牛应用中心比较 `manifest` 的 `version` 时只保留开头的 `x.y.z`。[社区文档](https://github.com/ckcoding/fnnas-docs/blob/main/docs/core-concepts/manifest.md)里的示例包括 `1.0.0` 和 `2.1.3-beta`，但 `1.0.2b6` 与 `1.0.2b7` 都会被看成 `1.0.2`，商店判定已安装相同或更高版本，无法升级。第四段构建号也不参与这次比较。
+
+Octop 发版号是 PEP 440，beta 写成 `X.Y.ZbN`。`scripts/fnos/store_version.sh` 在打包时把 beta 编进 patch，只写进 FPK 的 `manifest`。beta 序号 N 为 1–99：
+
+| Octop（`pyproject.toml`） | 应用中心版本 |
+|---------------------------|----------------|
+| `X.Y.ZbN` | `X.Y.(Z×100+N)` |
+| `X.Y.Z` | `X.Y.(Z×100+100)` |
+
+| Octop | 应用中心版本 |
+|-------|----------------|
+| `1.0.2b8` | `1.0.208` |
+| `1.0.2b10` | `1.0.210` |
+| `1.0.2` | `1.0.300` |
+| `1.0.3b1` | `1.0.301` |
+| `1.0.3` | `1.0.400` |
+
+上面几行的大小关系与 PEP 440 一致：`1.0.2b8` < `1.0.2b10` < `1.0.2` < `1.0.3b1` < `1.0.3`。已安装的旧 beta 在商店侧只剩 `1.0.2`，因此能升到 `1.0.208`。
+
+打进包里的镜像标签和 `.fpk` 文件名仍用 PEP 440，来自 `pyproject.toml`。仓库里两个 `manifest` 的 `version` 和 `fnos/docker/app/docker/docker-compose.yaml` 的 `image` 都是占位 `0.0.0`，发版不改。`scripts/build-fpk.sh` 打包时写入商店版本和真实镜像标签。
+
+打包只接受 `X.Y.Z` 和 `X.Y.ZbN`。`1.0.2a1`、`1.0.2rc1`、`1.0.2b0`、`1.0.2b100`，以及带 `.dev` 的版本会失败。
+
 ## 工作机制
 
-1. **发版链路**：`v*` tag → `release.yml`（PyPI + GitHub Release）与 `docker-publish.yml`（GHCR / Hub）并行；Release 成功后自动 `workflow_dispatch` 本工作流（`temporary=false`）。
+1. **发版链路**：`v`* tag → `release.yml`（PyPI + GitHub Release）与 `docker-publish.yml`（GHCR / Hub）并行；Release 成功后自动 `workflow_dispatch` 本工作流（`temporary=false`）。
 2. **镜像复用**：本工作流从不 push 镜像。正式包由 `ensure-image` 轮询等待 `ghcr.io/tencentcloud/octop:{version}`（docker-publish 推送的 amd64+arm64 清单）。Docker 版 `.fpk` 仅打包 compose，运行时拉取该镜像。
-3. **Wheel 复用**：正式包的 Native 版优先从同版本 GitHub Release（`v*`）下载 `octop-*.whl`；若缺失再回退源码构建前端 + wheel。
-4. **安装包构建**：`fpk` / `native` / `native-arm64` job 用 `scripts/build-fpk.sh` 打包。官方 fnpack 只有 linux-amd64，ARM 本地版先在 `ubuntu-24.04-arm` 上装好 aarch64 `site-packages`，再回到 amd64 runner 打包。正式包挂到同一个 `v*` GitHub Release（与 wheel、桌面包并列）。
+3. **Wheel 复用**：正式包的 Native 版优先从同版本 GitHub Release（`v`*）下载 `octop-*.whl`；若缺失再回退源码构建前端 + wheel。
+4. **安装包构建**：`fpk` / `native` / `native-arm64` job 用 `scripts/build-fpk.sh` 打包。官方 fnpack 只有 linux-amd64，ARM 本地版先在 `ubuntu-24.04-arm` 上装好 aarch64 `site-packages`，再回到 amd64 runner 打包。正式包挂到同一个 `v`* GitHub Release（与 wheel、桌面包并列）。
 5. **临时包**：手动 Run workflow 勾选 `temporary`。从当前分支打 `.fpk`，文件名带 `tmp-<shortsha>`，只出现在该次 Actions artifact。不推送 Docker、不等待 GHCR、不挂 Release、不上传 COS。Native 用当前源码构建 wheel。Docker 版 `.fpk` 仍指向 `ghcr.io/tencentcloud/octop:{version}`，飞牛上要能拉到该标签才能跑。
 
 ## 本地构建 .fpk（无需 Docker）
