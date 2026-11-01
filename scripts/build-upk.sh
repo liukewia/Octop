@@ -8,6 +8,9 @@
 #   bash scripts/build-upk.sh
 #
 # 环境变量见 ugos/README.md。
+# 镜像标签与产物文件名仍用 PEP 440（如 1.0.3b1）。
+# project.yaml 的 version 与 ugcli --build 使用商店可比版本，见
+# scripts/ugos/store_version.sh（1.0.3b1 → 1.0.3 + --build 1 → 1.0.3.0001）。
 # =============================================================================
 set -euo pipefail
 
@@ -17,23 +20,36 @@ OUT="$ROOT/dist"
 UGCLI_BASE_URL="https://osswaf.ugnas.com/pro/ugcli/download"
 UGCLI_VERSION_FLOOR="1.1.0.25"
 
-VER="${OCTOP_VERSION:-$(grep -m1 '^version' "$ROOT/pyproject.toml" | sed -E 's/.*"([0-9][0-9.]*[0-9])".*/\1/')}"
+# Accept full PEP 440 strings in quotes (e.g. 1.0.3b1), not digits-only.
+VER="${OCTOP_VERSION:-$(sed -nE 's/^version[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' "$ROOT/pyproject.toml" | head -1)}"
 [ -n "$VER" ] || { echo "无法从 pyproject.toml 解析版本"; exit 1; }
+case "$VER" in
+  *[[:space:]]*|*[\"\']*)
+    echo "解析到的版本非法: $VER"
+    exit 1
+    ;;
+esac
+# shellcheck source=scripts/ugos/store_version.sh
+source "$ROOT/scripts/ugos/store_version.sh"
+STORE_VER="$(ugos_store_version "$VER")"
+YAML_VER="${STORE_VER%.*}"
+# 10# 避免 0100 被当成八进制。
+BUILD_NUM=$((10#${STORE_VER##*.}))
 
 IMAGE_REPO="${OCTOP_UPK_IMAGE:-ghcr.io/tencentcloud/octop}"
 IMAGE="${IMAGE_REPO}:${VER}"
-BUILD_NUM="${UPK_BUILD:-1}"
 
-echo "[build-upk] Octop 版本: $VER"
+echo "[build-upk] Octop 版本: $VER (绿联商店: $STORE_VER)"
 echo "[build-upk] 镜像: $IMAGE"
+echo "[build-upk] project.yaml version: $YAML_VER"
 echo "[build-upk] ugcli --build: $BUILD_NUM"
 
 [ -f "$PKG/project.yaml" ] || { echo "[build-upk] 缺少 $PKG/project.yaml"; exit 1; }
 [ -f "$PKG/rootfs_common/docker-compose.yaml" ] || { echo "[build-upk] 缺少 docker-compose.yaml"; exit 1; }
 [ -f "$PKG/rootfs_common/icon.png" ] || { echo "[build-upk] 缺少 icon.png"; exit 1; }
 
-# version: x.y.z in project.yaml
-sed -i.bak -E "s/^(version: ).*/\\1${VER}/" "$PKG/project.yaml" && rm -f "$PKG/project.yaml.bak"
+# version: x.y.z in project.yaml; beta index goes to --build.
+sed -i.bak -E "s/^(version: ).*/\\1${YAML_VER}/" "$PKG/project.yaml" && rm -f "$PKG/project.yaml.bak"
 
 # image: repo:tag — keep a single image line
 sed -i.bak -E "s|^(    image: ).*|\\1${IMAGE}|" "$PKG/rootfs_common/docker-compose.yaml" && rm -f "$PKG/rootfs_common/docker-compose.yaml.bak"

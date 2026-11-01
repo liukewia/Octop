@@ -85,6 +85,9 @@ def test_publish_skill_bumps_fnos_manifest_versions() -> None:
     assert "fnos/docker/manifest" in text
     assert "fnos/native/manifest" in text
     assert "fnos/docker/app/docker/docker-compose.yaml" in text
+    assert "ugos/project.yaml" in text
+    assert "ugos/rootfs_common/docker-compose.yaml" in text
+    assert "占位 `0.0.0`" in text
     assert "uv.lock" in text
 
 

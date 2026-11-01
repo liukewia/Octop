@@ -1,9 +1,11 @@
 # UGOS Pro Docker app metadata for Octop.
 # spec: https://developer.ugnas.com/doc/tools/project-yaml.html
-# version is overwritten by scripts/build-upk.sh from pyproject.toml.
+# Placeholder only. scripts/build-upk.sh overwrites version from pyproject.toml
+# (x.y.z) and passes --build. Do not bump it in release commits.
+# See ugos/README.md section 版本号映射.
 spec_version: "2.1"
 app_id: com.tencentcloud.docker.octop
-version: 1.0.1
+version: 0.0.0
 support_arch:
   - amd64
 product_series:
