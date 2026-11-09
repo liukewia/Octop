@@ -166,16 +166,25 @@ def resolve_media_agent_id(chat_agent_id: str, raw_url: str) -> str:
     return agent_id_from_workspace_path(raw_url) or chat_agent_id
 
 
+def _has_parent_segment(path: str) -> bool:
+    return any(part == ".." for part in path.replace("\\", "/").split("/"))
+
+
 def extract_workspace_rel(path: str) -> str | None:
     """Return ``outbound/…`` or ``inbound/…`` when present in *path* (any common shape)."""
     raw = path.strip()
     fs_path = file_url_to_abs_path(raw) if raw.startswith("file://") else raw.lstrip("/")
     normalized = fs_path.replace("\\", "/")
+    if _has_parent_segment(normalized):
+        return None
     if normalized.startswith(("outbound/", "inbound/")):
         return normalized
     for marker in ("/outbound/", "/inbound/"):
         if marker in normalized:
-            return normalized[normalized.index(marker) + 1 :]
+            rel = normalized[normalized.index(marker) + 1 :]
+            if _has_parent_segment(rel):
+                return None
+            return rel
     return None
 
 
@@ -192,6 +201,8 @@ def normalize_workspace_download_path(path: str) -> str:
     raw = path.strip()
     if not raw:
         raise ValueError("empty path")
+    if _has_parent_segment(raw):
+        raise ValueError(f"path escapes workspace: {raw!r}")
     rel = extract_workspace_rel(raw)
     if rel:
         return rel
@@ -495,6 +506,9 @@ async def read_file_url_bytes(
         if data is not None:
             return data
 
+    if _is_host_absolute(path) and not _abs_path_allowed(path, workspace=workspace.workspace_dir):
+        return None
+
     data = await _download_via_workspace(workspace, path)
     if data is not None:
         return data
@@ -552,6 +566,9 @@ async def ensure_workspace_media_path(
 
     if not _is_host_absolute(abs_path):
         return existing
+
+    if not _abs_path_allowed(abs_path, workspace=workspace.workspace_dir):
+        return None
 
     dest = _outbound_dest_rel(filename=filename, abs_path=abs_path, mime=mime)
     data = await _download_via_workspace(workspace, abs_path)
