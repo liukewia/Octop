@@ -983,3 +983,25 @@ async def test_oauth_callback_escapes_error_html(env, exchange_error):
     assert response.status_code == 400
     assert payload not in response.text
     assert escape(payload) in response.text
+
+
+async def test_custom_mcp_mutation_requires_permission(env):
+    c, _, admin_auth, _ = env
+    user_auth = await create_user(
+        c,
+        admin_auth,
+        username="no_custom_mcp",
+        permissions=["connector_builtin"],
+    )
+    denied = await c.put(
+        "/api/connectors/custom-mcp",
+        headers=user_auth,
+        json={"servers": {"local": {"transport": "stdio", "command": "npx"}}},
+    )
+    assert denied.status_code == 403
+    probe = await c.post(
+        "/api/connectors/custom-mcp/test",
+        headers=user_auth,
+        json={"server": {"transport": "stdio", "command": "npx"}},
+    )
+    assert probe.status_code == 403
