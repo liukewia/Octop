@@ -133,3 +133,34 @@ def test_windows_arm64_overrides_drop_unwheeled_ocr(tmp_path: Path) -> None:
     assert "opencv-python ; sys_platform == 'octop-unsupported'" in text
     assert "pyclipper ; sys_platform == 'octop-unsupported'" in text
     assert "cryptography==46.0.0" in text
+
+
+@posix_only
+def test_darwin_amd64_cryptography_keeps_mldsa(tmp_path: Path) -> None:
+    """webauthn 3 imports mldsa while the sidecar boots.
+
+    49 dropped macOS x86_64 wheels. 48.0.1 is the last universal2 release that
+    still contains that module; 46.x starts and then exits with ModuleNotFoundError.
+    """
+    assert BASH is not None
+    common = REPO_ROOT / "desktop" / "portable" / "_common.sh"
+    out = tmp_path / "overrides-darwin-amd64.txt"
+    result = subprocess.run(
+        [
+            BASH,
+            "-c",
+            'source "$1" && write_green_overrides darwin-amd64 "$2"',
+            "bash",
+            str(common),
+            str(out),
+        ],
+        capture_output=True,
+        text=True,
+        env={**os.environ, "REPO_ROOT": str(REPO_ROOT), "GREEN_ROOT": str(tmp_path)},
+        timeout=30,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    text = out.read_text(encoding="utf-8")
+    assert "cryptography==48.0.1" in text
+    assert "cryptography==46." not in text

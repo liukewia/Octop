@@ -111,7 +111,21 @@ def main() -> int:
         elif got != expected:
             errors.append(f"{dist}: installed {got}, want {expected}")
 
-    for mod in _SMOKE_IMPORTS:
+    smoke = list(_SMOKE_IMPORTS)
+    # webauthn 3 imports mldsa at startup. That module arrived in cryptography 47.
+    crypto = pins.get("cryptography")
+    crypto_major = (
+        int(crypto.split(".", 1)[0]) if crypto and crypto.split(".", 1)[0].isdigit() else 0
+    )
+    if crypto_major >= 47:
+        smoke.extend(
+            [
+                "cryptography.hazmat.primitives.asymmetric.mldsa",
+                "webauthn",
+            ]
+        )
+
+    for mod in smoke:
         try:
             importlib.import_module(mod)
         except Exception as exc:

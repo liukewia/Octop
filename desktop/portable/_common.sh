@@ -244,10 +244,12 @@ pbs_archive_name() {
 # Write platform-specific uv/pip overrides (empty file = none).
 # Prints the override file path when overrides exist; otherwise prints nothing.
 #
-# cryptography: locked 49.x dropped macOS Intel / universal2 wheels. Native
+# cryptography: locked 49.x dropped macOS x86_64 / universal2 wheels. Native
 # darwin-amd64 builds then compile from sdist and link Homebrew OpenSSL
 # (/usr/local/opt/openssl@3), which is missing on end-user machines.
-# Pin to the last release that still ships macosx_*_universal2 wheels.
+# Pin to 48.0.1: the last release with macosx_*_universal2 wheels that also
+# ships hazmat...mldsa. webauthn 3 imports that module while the sidecar boots,
+# so a 46.x pin exits before the server listens.
 #
 # uv --python-platform *-apple-darwin resolves as macOS 13.0 unless
 # MACOSX_DEPLOYMENT_TARGET is set. Locked onnxruntime 1.28 only publishes
@@ -284,9 +286,9 @@ write_green_overrides() {
       ;;
     darwin-amd64)
       {
-        # 46.0.3 still publishes cp*-abi3-macosx_10_9_universal2 (covers x86_64).
-        # cryptography>=47 only ships macos arm64 wheels → sdist + brew openssl.
-        echo "cryptography==46.0.3"
+        # 49+ is arm64-only on macOS. 48.0.1 still publishes
+        # cp*-abi3-macosx_10_9_universal2 and includes mldsa (added in 47).
+        echo "cryptography==48.0.1"
         echo "onnxruntime==1.23.2"
         # 4.12 needs numpy<2.3, which fights the locked numpy 2.5. 4.13+ Intel
         # wheels are macosx_14. 4.11.0.86 still has macosx_13_0_x86_64 and
