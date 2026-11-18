@@ -136,6 +136,8 @@ Windows 的 `pywin32_system32` 下的 `pywintypes*.dll` 在打 zip 时复制到 
 
 每次桌面启动都拉起自己的 Python 进程。壳不读取 `config.json` 的监听地址来寻找后台，也不读取 `desktop-port`，也不接管终端里已经运行的 `octop run`。
 
+可选的云端连接是例外：用户填了 host、用户名和密码时，这次启动不拉起 Python，主进程把 API 与 WebSocket 转到那台服务端。规格见 [`REMOTE_BACKEND.zh.md`](REMOTE_BACKEND.zh.md)。三个字段都空时，下面的本机规则不变。
+
 1. **回环地址**：本次进程固定监听 `127.0.0.1`。通过 `OCTOP_BIND_HOST=127.0.0.1` 覆盖本次进程，不写回 `config.json`。
 2. **随机端口**：壳向操作系统申请一个临时端口（绑定 `127.0.0.1:0` 后立即关闭），再把得到的端口通过 `OCTOP_PORT` 传给子进程。端口只存在于本次进程。
 3. **不写配置**：启动命令是 `launch.py run`，不传 `--host` 或 `--port`。这两个 CLI 参数会写回 `config.json`；环境变量只覆盖本次进程。
@@ -345,7 +347,7 @@ Preload 仅暴露最小类型化桥梁 `window.octopDesktop`：
 - `onBackendReady(callback)`：接收后端服务就绪事件。
 - `setWindowChrome(theme)`：把页面主题（含「跟随系统」偏好）同步给 `nativeTheme`，让系统原生窗口按钮配色一致。没有最小化 / 最大化 / 关闭接口——窗口按钮完全原生，页面不参与。
 - `onWindowFullscreenChange(callback)`：进入 / 退出全屏时通知页面（macOS 全屏会隐藏交通灯，页面据此收回为它们预留的条带）。
-- `clientSettings`：供 Web 设置页读写新增的客户端项（开机启动、关闭行为、主题背景、是否只跟随稳定版）。不能写 `config.json`，也不能指定更新检测地址或安装包地址。
+- `clientSettings`：供 Dashboard 读写壳自己的设置（开机启动、开机后是否打开窗口、关闭行为、主题背景、是否只跟随稳定版）。不能写 `config.json`，也不能指定更新检测地址或安装包地址。开机启动和关闭行为在账号菜单；只跟随稳定版在检查更新页。
 - `installUpdate()`：页面确认后开始安装。不接受参数，渲染进程不能指定包地址。检查失败和安装失败仍由主进程的系统框提示。
 - `wsEndpoint()`：返回 WebSocket 中继的地址（§5.2）。同步返回，因为 URL 拼装发生在渲染路径里没法 await；没有中继时返回 `null`，页面就回退到"从自身 origin 推导"。
 
@@ -401,7 +403,7 @@ Preload 仅暴露最小类型化桥梁 `window.octopDesktop`：
 桌面不另开壳设置页。客户端设置作为新增项放进 Dashboard 已有的 Web 设置。
 
 - 原有页面保留：模型、用户、安全、存储、语言、环境变量、备份等继续由 Python 后端保存，请求仍走 `octop://app/api/*`。
-- 新增项也画在这些 Web 页面里。主进程通过 `clientSettings` 读写，不写入 `config.json`。项包括开机启动、关闭窗口时退出还是留在托盘、早期窗口使用的主题背景、壳自己的更新检查，以及「只跟随稳定版」。浏览器里打开的服务器版没有这些项。
+- 开机启动、开机后是否打开窗口、关闭窗口时退出还是留在托盘（macOS 文案为留在程序坞）画在账号菜单里，只在桌面壳出现。主进程通过 `clientSettings` 读写，不写入 `config.json`。主题背景仍由外观开关写入同一份设置，供早期窗口使用。只跟随稳定版和壳的更新检查留在检查更新页。浏览器里打开的服务器版没有这些项。登录项拉起且勾了「开机后不打开窗口」时，窗口先藏着，从 Dock 或托盘打开；从图标手动启动仍然显示窗口。Windows 或 Linux 没有托盘图标时不藏窗口。启动失败页照常显示。
 
 服务器版和 CLI 仍然可以使用 Web 设置里的「检查更新」「立即升级」，以及 `octop update`。桌面托管的这次 Python 进程不行。
 
@@ -642,6 +644,6 @@ query（页面是 `sandbox: true`、无 preload、无 IPC，这是两者唯一�
 5. 就绪信号来自 `/api/health`，不解析日志文本。
 6. 渲染进程不知道后台凭据，不获得 Node.js 或原始 IPC 能力。
 7. 正常退出优先，强制进程树回收仅作为超时兜底。
-8. 桌面更新由壳检测：`GET https://octop.cloud/api/downloads`，用 `data.client.stable` 与 `data.client.beta` 区分稳定版和测试版。用户默认只跟随稳定版，可以关闭该选项以接收测试版。壳、Dashboard 和绿色 Python 运行时同一发布版本。客户端设置加在原有 Web 设置里，不另开壳设置页；桌面进程拒绝 Web 应用内更新。
+8. 桌面更新由壳检测：`GET https://octop.cloud/api/downloads`，用 `data.client.stable` 与 `data.client.beta` 区分稳定版和测试版。用户默认只跟随稳定版，可以关闭该选项以接收测试版。壳、Dashboard 和绿色 Python 运行时同一发布版本。开机启动和关闭行为在账号菜单，只跟随稳定版在检查更新页，不另开壳设置页；桌面进程拒绝 Web 应用内更新。
 9. Windows 安装使用带目录页的 NSIS 向导，用户可以选择安装位置和盘符。升级沿用该目录；用户数据仍在 `OCTOP_HOME`（未设置时为 `%USERPROFILE%\.octop`）。
 10. 三个平台的运行时都随安装目录替换。只有退回把 zip 解压到 `OCTOP_HOME` 时，才用随包 `portable-version.json` 与 `<OCTOP_HOME>/portable/version.json` 的 `version` 比较。本地版本更高则停止启动，错误提示写出检测到的本地版本，并保留现有运行时与用户数据。

@@ -14,6 +14,7 @@ from pydantic import ValidationError
 from starlette.websockets import WebSocketState
 
 from octop.api.common.agent import assert_agent_access
+from octop.api.common.session_cookie import presented_access_token
 from octop.api.deps import resolve_user_from_token
 from octop.api.routers.chat.models import UserTurnWsFrame
 from octop.api.routers.chat.sse import json_chunk_default
@@ -59,6 +60,7 @@ async def dashboard_chat_ws(
 ) -> None:
     """Bidirectional Dashboard chat. Wire protocol mirrors harness stream chunks."""
     server = websocket.app.state.octop_server
+    token = presented_access_token(token, websocket.cookies)
     if not token:
         await websocket.close(code=4001, reason="missing token")
         return

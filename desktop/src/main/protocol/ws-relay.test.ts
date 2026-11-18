@@ -9,7 +9,9 @@ import {
 import type { Socket } from "node:net";
 import { test } from "node:test";
 
-import { WsRelay } from "./ws-relay";
+import { loopbackTarget } from "../connection/target";
+import { normalizeOrigin, remoteBackend } from "../connection/profile";
+import { upstreamOptions, WsRelay } from "./ws-relay";
 
 /**
  * §5.2 — the relay is the only path a WebSocket can take out of the sandboxed
@@ -121,12 +123,13 @@ function nextChunk(socket: Socket): Promise<string> {
 }
 
 async function withRelay(
-  options: { backendPort?: () => number; allowedOrigin?: string },
+  options: { backendPort?: () => number; allowedOrigin?: string; extraOrigins?: readonly string[] },
   body: (context: { relay: WsRelay; baseUrl: string; token: string; port: number }) => Promise<void>,
 ): Promise<void> {
   const relay = new WsRelay({
-    backendPort: options.backendPort ?? (() => 0),
+    backend: () => loopbackTarget((options.backendPort ?? (() => 0))()),
     allowedOrigin: options.allowedOrigin ?? ORIGIN,
+    extraOrigins: options.extraOrigins,
   });
   const endpoint = await relay.start();
   const port = Number(new URL(endpoint.baseUrl).port);
@@ -138,7 +141,7 @@ async function withRelay(
 }
 
 test("no endpoint until the relay is listening", async () => {
-  const relay = new WsRelay({ backendPort: () => 0, allowedOrigin: ORIGIN });
+  const relay = new WsRelay({ backend: () => null, allowedOrigin: ORIGIN });
   assert.equal(relay.endpoint, null);
 
   const endpoint = await relay.start();
@@ -227,6 +230,29 @@ test("another origin cannot borrow the relay, even with the right path", async (
   }
 });
 
+test("a shell dev origin is accepted and a third origin is not", async () => {
+  const upstream = await startUpstream();
+  try {
+    await withRelay(
+      { backendPort: () => upstream.port, extraOrigins: ["http://127.0.0.1:5173"] },
+      async ({ token, port }) => {
+        const dev = await dial(port, `/${token}/api/terminal/ws`, {
+          origin: "http://127.0.0.1:5173",
+        });
+        assert.equal(dev.status, 101);
+        dev.socket?.destroy();
+
+        const foreign = await dial(port, `/${token}/api/terminal/ws`, {
+          origin: "https://evil.example",
+        });
+        assert.equal(foreign.status, 403);
+      },
+    );
+  } finally {
+    await upstream.close();
+  }
+});
+
 test("only /api paths are relayed", async () => {
   const upstream = await startUpstream();
   try {
@@ -270,8 +296,26 @@ test("a refusal from the sidecar is passed back, not turned into a tunnel", asyn
   }
 });
 
+test("a remote dial verifies the certificate and a loopback dial stays local", () => {
+  const remote = upstreamOptions(remoteBackend(normalizeOrigin("https://octop.example.com:8443")));
+  assert.equal(remote.tls, true);
+  if (!remote.tls) return;
+  assert.equal(remote.host, "octop.example.com");
+  assert.equal(remote.port, 8443);
+  assert.equal(remote.servername, "octop.example.com");
+  assert.equal(remote.rejectUnauthorized, true);
+
+  const local = loopbackTarget(43123);
+  assert.ok(local);
+  const plain = upstreamOptions(local);
+  assert.equal(plain.tls, false);
+  if (plain.tls) return;
+  assert.equal(plain.host, "127.0.0.1");
+  assert.equal(plain.port, 43123);
+});
+
 test("stop() refuses connections afterwards", async () => {
-  const relay = new WsRelay({ backendPort: () => 1, allowedOrigin: ORIGIN });
+  const relay = new WsRelay({ backend: () => loopbackTarget(1), allowedOrigin: ORIGIN });
   const endpoint = await relay.start();
   const port = Number(new URL(endpoint.baseUrl).port);
   await relay.stop();

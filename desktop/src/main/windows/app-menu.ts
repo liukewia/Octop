@@ -11,6 +11,7 @@ import type { MenuItemConstructorOptions } from "electron";
  */
 
 const WINDOWS_MENU_COMMANDS = [
+  "connection",
   "close",
   "quit",
   "undo",
@@ -54,11 +55,18 @@ export interface WindowsMenuSeparator {
 export type WindowsMenuEntry = WindowsMenuCommand | WindowsMenuSeparator;
 
 export interface WindowsMenuModel {
-  titles: [string, string, string, string];
-  menus: [WindowsMenuEntry[], WindowsMenuEntry[], WindowsMenuEntry[], WindowsMenuEntry[]];
+  titles: [string, string, string, string, string];
+  menus: [
+    WindowsMenuEntry[],
+    WindowsMenuEntry[],
+    WindowsMenuEntry[],
+    WindowsMenuEntry[],
+    WindowsMenuEntry[],
+  ];
 }
 
 export interface WindowsAppMenuLabels {
+  app: string;
   file: string;
   edit: string;
   view: string;
@@ -69,6 +77,7 @@ export interface WindowsAppMenuLabels {
 export function windowsAppMenuLabels(locale: string): WindowsAppMenuLabels {
   if (locale.toLowerCase().startsWith("zh")) {
     return {
+      app: "Octop",
       file: "文件",
       edit: "编辑",
       view: "视图",
@@ -77,6 +86,7 @@ export function windowsAppMenuLabels(locale: string): WindowsAppMenuLabels {
     };
   }
   return {
+    app: "Octop",
     file: "File",
     edit: "Edit",
     view: "View",
@@ -99,8 +109,9 @@ export function windowsMenuModel(locale: string): WindowsMenuModel {
   const zh = locale.toLowerCase().startsWith("zh");
   const text = (zhLabel: string, enLabel: string) => (zh ? zhLabel : enLabel);
   return {
-    titles: [labels.file, labels.edit, labels.view, labels.help],
+    titles: [labels.app, labels.file, labels.edit, labels.view, labels.help],
     menus: [
+      [command("connection", text("云端实例", "Cloud instance"), null)],
       [
         command("close", text("关闭", "Close"), "Ctrl+W"),
         { kind: "separator" },
@@ -136,6 +147,7 @@ export function windowsMenuModel(locale: string): WindowsMenuModel {
 export function windowsApplicationMenu(
   locale: string,
   onAbout: () => void,
+  onConnection: () => void,
 ): MenuItemConstructorOptions[] {
   const model = windowsMenuModel(locale);
   return model.titles.map((label, index) => ({
@@ -143,7 +155,42 @@ export function windowsApplicationMenu(
     submenu: (model.menus[index] ?? []).map((entry): MenuItemConstructorOptions => {
       if (entry.kind === "separator") return { type: "separator" };
       if (entry.id === "about") return { id: entry.id, label: entry.label, click: onAbout };
+      if (entry.id === "connection") return { id: entry.id, label: entry.label, click: onConnection };
       return { id: entry.id, role: entry.id };
     }),
   }));
+}
+
+/**
+ * macOS system menu bar. Cloud instance lives in the Octop menu, with About
+ * and Quit, because it changes which backend this app uses.
+ */
+export function macApplicationMenu(
+  locale: string,
+  onConnection: () => void,
+): MenuItemConstructorOptions[] {
+  const zh = locale.toLowerCase().startsWith("zh");
+  const text = (zhLabel: string, enLabel: string) => (zh ? zhLabel : enLabel);
+  return [
+    {
+      label: "Octop",
+      submenu: [
+        { role: "about" },
+        { type: "separator" },
+        { label: text("云端实例", "Cloud instance"), click: onConnection },
+        { type: "separator" },
+        { role: "services" },
+        { type: "separator" },
+        { role: "hide" },
+        { role: "hideOthers" },
+        { role: "unhide" },
+        { type: "separator" },
+        { role: "quit" },
+      ],
+    },
+    { role: "fileMenu" },
+    { role: "editMenu" },
+    { role: "viewMenu" },
+    { role: "windowMenu" },
+  ];
 }

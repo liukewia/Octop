@@ -18,6 +18,11 @@ export interface DeviceSessionOptions {
   label: string;
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
+  /**
+   * False while the shell is signed into a remote instance. Renewal must not
+   * present the device credential to that host.
+   */
+  active?: () => boolean;
 }
 
 interface JsonResponse {
@@ -62,6 +67,7 @@ export class DeviceSessionClient {
 
   /** Mint a fresh JWT, or null when there is no usable credential. */
   async renew(): Promise<IssuedSession | null> {
+    if (this.options.active && !this.options.active()) return null;
     const secret = await this.options.store.read();
     if (!secret) return null;
     const res = await this.post("/api/auth/device/token", { device_token: secret });

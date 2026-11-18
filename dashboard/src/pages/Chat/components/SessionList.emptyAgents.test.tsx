@@ -15,6 +15,7 @@ vi.mock("../../Settings/AdvancedSettings/BridgeSettings", () => ({
   default: () => null,
 }));
 import { octopThreadsApi } from "../../../api/modules/octopThreads";
+import styles from "../index.module.less";
 import SessionList from "./SessionList";
 
 function renderList(props: { unreadyExperts?: number } = {}) {
@@ -58,6 +59,9 @@ describe("SessionList empty experts", () => {
     expect(screen.getByText("chat.noAgentsHint")).toBeInTheDocument();
     expect(screen.getByText("chat.createExpert")).toBeInTheDocument();
     expect(screen.queryByText("chat.noChattableAgentsHint")).toBeNull();
+    expect(screen.getByRole("tablist").parentElement).toHaveClass(
+      styles.sessionChromeRow,
+    );
   });
 
   it("points at the experts page when they own one that cannot chat", () => {

@@ -6,6 +6,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends
 
+from octop import __version__
 from octop.api.deps import get_server
 
 router = APIRouter()
@@ -32,4 +33,5 @@ async def health(server: Any = Depends(get_server)) -> dict[str, Any]:
         "users_loaded": users,
         "agents_running": agents,
         "channels": channels,
+        "version": __version__,
     }

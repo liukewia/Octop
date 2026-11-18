@@ -10,12 +10,13 @@ import {
   getDesktopBridge,
   type WindowsMenuModel,
 } from "../utils/desktopBridge";
+import { requestConnectionMenu } from "../utils/connectionMenu";
 import { chromeSlot } from "../utils/overlayLayers";
 import LinuxWindowControls from "./LinuxWindowControls";
 
 /**
  * One full-width caption row on Windows and Linux. The transparent overlay
- * hides the native menu bar, so this row carries File / Edit / View / Help
+ * hides the native menu bar, so this row carries Octop / File / Edit / View / Help
  * beside the window buttons and draws each submenu in the page. Choosing an
  * item asks the shell to run that command.
  * Fullscreen keeps this row; the native caption buttons are hidden separately.
@@ -134,6 +135,10 @@ export default function WindowsAppMenu() {
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => {
                     setOpen(null);
+                    if (entry.id === "connection") {
+                      requestConnectionMenu();
+                      return;
+                    }
                     void getDesktopBridge()?.windowsMenu?.invoke(entry.id);
                   }}
                 >

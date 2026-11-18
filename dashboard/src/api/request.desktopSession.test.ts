@@ -109,6 +109,23 @@ describe("desktop device session", () => {
     expect(replace).toHaveBeenCalledWith("/login");
   });
 
+  it("renews a cloud account once when the shell is connected remotely", async () => {
+    const renewed = tokenFor("ada");
+    const session = installBridge(renewed);
+    const desktop = (globalThis as unknown as { octopDesktop: { connection: unknown } }).octopDesktop;
+    desktop.connection = {
+      get: vi.fn().mockResolvedValue({ mode: "remote" }),
+    };
+    mod.setAuthToken(tokenFor("ada"));
+    fetchMock
+      .mockResolvedValueOnce(tokenExpiredResponse())
+      .mockResolvedValueOnce(okResponse({ items: [] }));
+
+    await expect(mod.request("/agents")).resolves.toEqual({ items: [] });
+    expect(session.renew).toHaveBeenCalledOnce();
+    expect(mod.getAuthToken()).toBe(renewed);
+  });
+
   it("registers the device credential for the local account only", async () => {
     const session = installBridge("unused");
     const localToken = tokenFor("local");

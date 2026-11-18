@@ -13,6 +13,7 @@ from typing import Any
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 from starlette.websockets import WebSocketState
 
+from octop.api.common.session_cookie import presented_access_token
 from octop.api.deps import resolve_user_from_token
 from octop.infra.control.desktop.input import canvas_to_screen, run_desktop_action
 from octop.infra.control.desktop.session import (
@@ -270,7 +271,9 @@ async def desktop_stream_ws(
             await _send_json(websocket, {"type": "error", "message": "expected start message"})
             return
 
-        auth_token = _auth_token_from_start(start_msg, token)
+        auth_token = _auth_token_from_start(
+            start_msg, presented_access_token(token, websocket.cookies)
+        )
         if not auth_token:
             await _send_json(
                 websocket, {"type": "error", "code": "AUTH_FAILED", "message": "missing token"}

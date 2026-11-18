@@ -908,7 +908,12 @@ export default function SessionList({
         </div>
       ) : null}
 
-      <div className={styles.sessionScopeRow}>
+      <div
+        className={cx(
+          styles.sessionScopeRow,
+          agents.length === 0 && styles.sessionChromeRow,
+        )}
+      >
         <ChatNavScopeTabs value={navScope} onChange={setNavScope} />
       </div>
       <div className={styles.sessionCreateRow}>

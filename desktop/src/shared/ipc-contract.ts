@@ -6,6 +6,11 @@
 export interface ClientSettings {
   /** Launch at login / open at login. */
   launchAtLogin: boolean;
+  /**
+   * When the login item starts the app, leave the window hidden until the
+   * user opens it from the Dock or tray. A normal launch still shows it.
+   */
+  launchWithoutWindow: boolean;
   /** Close-window behaviour: quit vs. keep in tray. */
   closeBehavior: "quit" | "tray";
   /**
@@ -79,4 +84,45 @@ export const IPC_CHANNELS = {
   sessionRegister: "octop:session:register",
   sessionRenew: "octop:session:renew",
   sessionRevoke: "octop:session:revoke",
+  /** Synchronous: the Dashboard reads this before its first render. */
+  sessionTakeRemote: "octop:session:take-remote",
+  connectionGet: "octop:connection:get",
+  connectionSet: "octop:connection:set",
+  connectionClear: "octop:connection:clear",
+  connectionConnect: "octop:connection:connect",
+  connectionOpenForm: "octop:connection:open-form",
+  connectionUseLocal: "octop:connection:use-local",
+  connectionLoginRemote: "octop:connection:login-remote",
+  connectionRelaunch: "octop:connection:relaunch",
+  /** The application menu asked this dashboard to open the cloud-instance dialog. */
+  connectionOpenMenu: "octop:connection:open-menu",
+  /** Synchronous: wipe the previous origin's JWT before the page boots. */
+  connectionConsumeReset: "octop:connection:consume-reset",
 } as const;
+
+export interface ConnectionView {
+  mode: "local" | "remote";
+  origin: string;
+  username: string;
+  hasPassword: boolean;
+  versionWarning: string | null;
+}
+
+export interface RemoteMfaChallenge {
+  mfa_required: true;
+  mfa_token: string;
+  methods: string[];
+  user_hint: string;
+  locale: string;
+}
+
+export type RemoteHandoff =
+  | { kind: "token"; access_token: string; expires_in: number }
+  | { kind: "mfa"; username: string; challenge: RemoteMfaChallenge }
+  | { kind: "captcha"; username: string };
+
+export interface ConnectionWriteResult {
+  ok: boolean;
+  error?: string;
+  detail?: string;
+}

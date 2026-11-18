@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import markUrl from "./assets/octop-mark.svg";
-import { decodeShellError } from "../../shared/shell-error";
+import { decodeShellError, FALLBACK_ERROR_MESSAGE } from "../../shared/shell-error";
 import { LinuxWindowControls } from "./linux-window-controls";
 import { mount } from "./mount";
 import "./base.less";
@@ -61,6 +62,7 @@ async function writeClipboard(text: string): Promise<boolean> {
 }
 
 function ErrorPage() {
+  const { t } = useTranslation();
   const payload = useMemo(
     () => decodeShellError(new URLSearchParams(window.location.search).get(PAYLOAD_PARAM)),
     [],
@@ -84,11 +86,12 @@ function ErrorPage() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  const title = payload.title ?? "Octop 无法启动";
-  const { message, detail, version } = payload;
+  const title = payload.title ?? t("error.title");
+  const message = payload.message === FALLBACK_ERROR_MESSAGE ? t("error.fallback") : payload.message;
+  const { detail, version } = payload;
 
   const copyLabel =
-    copyState === "copied" ? "已复制" : copyState === "failed" ? "复制失败" : "复制错误信息";
+    copyState === "copied" ? t("error.copied") : copyState === "failed" ? t("error.copyFailed") : t("error.copy");
 
   const handleCopy = () => {
     const text = [title, message, detail, version ? `Octop Desktop v${version}` : ""]
@@ -115,7 +118,7 @@ function ErrorPage() {
               onClick={handleRetry}
               autoFocus
             >
-              重试启动
+              {t("error.retry")}
             </button>
           ) : null}
           <button
@@ -124,7 +127,7 @@ function ErrorPage() {
             onClick={() => window.close()}
             autoFocus={!canRetry}
           >
-            退出应用
+            {t("error.quit")}
           </button>
         </div>
 
@@ -148,7 +151,7 @@ function ErrorPage() {
                     strokeLinejoin="round"
                   />
                 </svg>
-                技术详情
+                {t("error.details")}
               </summary>
               <pre className={styles.detail}>{detail}</pre>
             </details>
@@ -164,7 +167,7 @@ function ErrorPage() {
         </div>
       </div>
 
-      {version ? <p className={styles.meta}>Octop 桌面端 v{version}</p> : null}
+      {version ? <p className={styles.meta}>{t("error.meta", { version })}</p> : null}
     </main>
   );
 }

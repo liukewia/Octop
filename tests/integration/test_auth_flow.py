@@ -31,6 +31,27 @@ async def test_setup_required_then_login(client):
     assert r.status_code == 204
 
 
+async def test_login_cookie_authenticates_without_bearer(client):
+    c, _, home = client
+    await bootstrap_admin(c, home, username="alice", password="TestPass12")
+    logged_in = await c.post("/api/auth/login", json={"username": "alice", "password": "TestPass12"})
+    assert logged_in.status_code == 200
+    assert logged_in.json()["access_token"]
+    issued = logged_in.headers.get("set-cookie") or ""
+    attrs = issued.split(";", 1)[1].lower() if ";" in issued else ""
+    assert issued.startswith("octop_session=")
+    assert "httponly" in attrs
+    assert "secure" not in attrs
+
+    me = await c.get("/api/auth/me")
+    assert me.status_code == 200
+    assert me.json()["username"] == "alice"
+
+    logged_out = await c.post("/api/auth/logout")
+    assert logged_out.status_code == 204
+    assert (await c.get("/api/auth/me")).status_code == 401
+
+
 async def test_setup_again_410(client):
     c, _, home = client
     await bootstrap_admin(c, home, username="a", password="TestPass12")
@@ -80,6 +101,8 @@ async def test_health_no_auth_required(client):
     body = r.json()
     assert body["ok"] is True
     assert isinstance(body.get("started_at"), int)
+    assert isinstance(body.get("version"), str)
+    assert body["version"]
 
 
 async def test_captcha_public_is_setup_locked_then_slider(client):

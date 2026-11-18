@@ -13,8 +13,10 @@ import {
   tryReloadOnStaleChunk,
 } from "./utils/reloadOnStaleChunk";
 import { bootNativeWindowChrome } from "./utils/nativeWindowChrome";
+import { adoptDesktopRemoteSession } from "./utils/desktopSessionReset";
 
 if (typeof window !== "undefined") {
+  adoptDesktopRemoteSession();
   // Recover from post-deploy stale hashed chunks (white screen → soft reload).
   installChunkLoadRecovery();
 

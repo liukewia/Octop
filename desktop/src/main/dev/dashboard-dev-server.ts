@@ -77,6 +77,7 @@ export async function waitForDevServer(
     }
     try {
       const response = await fetch(url, { redirect: "manual" });
+      await response.body?.cancel();
       if (response.status < 500) return;
       lastError = `HTTP ${response.status}`;
     } catch (err) {
@@ -85,6 +86,44 @@ export async function waitForDevServer(
     await delay(250);
   }
   throw new Error(`dashboard dev server did not become ready (${lastError})`);
+}
+
+/**
+ * Vite logs "ready" and answers ``/`` before dep optimization finishes.
+ * Opening the window in that gap loads React from a half-written prebundle,
+ * and the first hook throws ``Cannot read properties of null (reading 'useContext')``.
+ * Touch the app entry so the crawl runs, then wait until the optimized React
+ * module is actually being served.
+ */
+export async function waitForOptimizedReact(
+  origin: string,
+  timeoutMs = READY_TIMEOUT_MS,
+  exited?: () => ViteExit | null,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  const entry = new URL("/src/main.tsx", origin).href;
+  const react = new URL("/node_modules/.vite/deps/react.js", origin).href;
+  let lastError = "dependencies not optimized";
+  while (Date.now() < deadline) {
+    const gone = exited?.();
+    if (gone) {
+      throw new Error(`vite exited code=${gone.code ?? "null"} signal=${gone.signal ?? "null"}`);
+    }
+    try {
+      const [entryRes, reactRes] = await Promise.all([
+        fetch(entry, { redirect: "manual", signal: AbortSignal.timeout(5_000) }),
+        fetch(react, { redirect: "manual", signal: AbortSignal.timeout(5_000) }),
+      ]);
+      await entryRes.body?.cancel();
+      await reactRes.body?.cancel();
+      if (entryRes.status === 200 && reactRes.status === 200) return;
+      lastError = `entry HTTP ${entryRes.status}, react HTTP ${reactRes.status}`;
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : String(err);
+    }
+    await delay(250);
+  }
+  throw new Error(`dashboard dev dependencies were not ready (${lastError})`);
 }
 
 let child: ChildProcess | null = null;
@@ -117,7 +156,9 @@ export async function startDashboardDevServer(options: {
   });
 
   try {
-    await waitForDevServer(dashboardDevOrigin(options.port), READY_TIMEOUT_MS, () => exit);
+    const origin = dashboardDevOrigin(options.port);
+    await waitForDevServer(origin, READY_TIMEOUT_MS, () => exit);
+    await waitForOptimizedReact(origin, READY_TIMEOUT_MS, () => exit);
   } catch (err) {
     stopDashboardDevServer();
     throw err;

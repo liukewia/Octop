@@ -67,6 +67,7 @@ from starlette.websockets import WebSocketState
 
 from octop.api.common.agent import assert_agent_owner
 from octop.api.common.agent_workspace import resolve_agent_workspace_dir
+from octop.api.common.session_cookie import presented_access_token
 from octop.api.deps import get_server, require_permission, resolve_user_from_token
 from octop.infra.errors import ErrorCode, OctopError
 from octop.infra.users.permissions import user_has_permission
@@ -513,7 +514,8 @@ async def terminal_ws(
     """
     server = websocket.app.state.octop_server
 
-    # --- auth (token query param + agent ownership) ---------------------
+    # --- auth (query token, or the session cookie when the page has no local token)
+    token = presented_access_token(token, websocket.cookies)
     if not token:
         await websocket.close(code=4001, reason="missing token")
         return

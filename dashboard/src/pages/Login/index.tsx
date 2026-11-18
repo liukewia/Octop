@@ -19,11 +19,14 @@ import {
 import {
   authApi,
   isMfaChallenge,
+  persistIssuedToken,
   type LdapStatus,
   type MfaChallengeResponse,
   type MfaMethod,
   type OauthProviderStatus,
 } from "../../api/modules/auth";
+import { readRemoteHandoff } from "../../utils/desktopSessionReset";
+import type { DesktopRemoteMfaChallenge } from "../../utils/desktopBridge";
 import { apiErrorMessage } from "../../utils/apiError";
 import { publicUrl } from "../../utils/publicUrl";
 import { refreshServerLabels } from "../../i18n";
@@ -57,7 +60,7 @@ import {
   releaseDesktopLocalAutoLogin,
   renewDesktopSession,
 } from "../../api/desktopSession";
-import { isDesktopShell } from "../../utils/desktopBridge";
+import { getDesktopBridge, isDesktopShell } from "../../utils/desktopBridge";
 
 // Per page load, not per mount: the point is to stop a renew/refuse cycle from
 // ping-ponging between /login and /chat.
@@ -102,6 +105,20 @@ function providerIcon(provider: OauthProviderStatus): ReactNode {
     );
   }
   return <KeyRound size={18} />;
+}
+
+function toMfaChallenge(challenge: DesktopRemoteMfaChallenge): MfaChallengeResponse {
+  const methods = challenge.methods.filter(
+    (item): item is MfaMethod =>
+      item === "totp" || item === "webauthn" || item === "recovery",
+  );
+  return {
+    mfa_required: true,
+    mfa_token: challenge.mfa_token,
+    methods,
+    user_hint: challenge.user_hint,
+    locale: challenge.locale,
+  };
 }
 
 function defaultMfaMode(methods: MfaMethod[]): MfaStepMode {
@@ -153,11 +170,33 @@ export default function LoginPage() {
   const [passkeyAvailable] = useState(() => isWebAuthnAvailable());
   const [passkeyIpHost] = useState(() => isWebAuthnIpHost());
   const [passwordlessLogin, setPasswordlessLogin] = useState(false);
+  const [remotePasswordHeld, setRemotePasswordHeld] = useState(false);
   const [conditionalOk, setConditionalOk] = useState(false);
   const conditionalAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     void applyGuestLocale();
+  }, []);
+
+  useEffect(() => {
+    const handoff = readRemoteHandoff();
+    if (handoff?.kind === "mfa") {
+      const challenge = toMfaChallenge(handoff.challenge);
+      setUsername(handoff.username);
+      setMfaChallenge(challenge);
+      setMfaMode(defaultMfaMode(challenge.methods));
+      return;
+    }
+    if (handoff?.kind === "captcha") {
+      setUsername(handoff.username);
+      setRemotePasswordHeld(true);
+      return;
+    }
+    void getDesktopBridge()?.connection?.get().then((view) => {
+      if (!view || view.mode !== "remote") return;
+      if (view.username) setUsername(view.username);
+      if (view.hasPassword) setRemotePasswordHeld(true);
+    });
   }, []);
 
   // Desktop: landing here does not mean a signed-out user. The shell holds a
@@ -284,7 +323,11 @@ export default function LoginPage() {
         return;
       }
       if (event.data.access_token) {
-        setAuthToken(event.data.access_token, event.data.remember ?? true);
+        const next = event.data.redirect || "/chat";
+        void persistIssuedToken(event.data.access_token, event.data.remember ?? true).then(() => {
+          window.location.replace(next);
+        });
+        return;
       }
       window.location.replace(event.data.redirect || "/chat");
     };
@@ -300,7 +343,7 @@ export default function LoginPage() {
   const finishLogin = useCallback(
     async (accessToken: string, locale: string | null | undefined) => {
       conditionalAbortRef.current?.abort();
-      setAuthToken(accessToken, remember);
+      await persistIssuedToken(accessToken, remember);
       setMfaChallenge(null);
       setMfaCode("");
       const applied = await applyUserLocale(locale);
@@ -429,10 +472,29 @@ export default function LoginPage() {
   };
 
   const handleLogin = async () => {
-    if (!username || !password || !captchaReady) return;
+    if (!username || (!remotePasswordHeld && !password) || !captchaReady) return;
     setLoading(true);
     try {
       const token = await captchaRef.current?.getToken();
+      if (remotePasswordHeld) {
+        const issued = await getDesktopBridge()?.session?.loginRemote?.({
+          captchaToken: token ?? undefined,
+        });
+        if (!issued?.ok || issued.error === "captcha") {
+          message.error(issued?.error || t("login.failed"));
+          resetCaptcha();
+          return;
+        }
+        if (issued.mfa) {
+          const challenge = toMfaChallenge(issued.mfa);
+          setMfaChallenge(challenge);
+          setMfaMode(defaultMfaMode(challenge.methods));
+          setMfaCode("");
+          return;
+        }
+        if (issued.access_token) await finishLogin(issued.access_token, null);
+        return;
+      }
       const res = await authApi.login(username, password, token);
       if (isMfaChallenge(res)) {
         setMfaChallenge(res);
@@ -768,19 +830,21 @@ export default function LoginPage() {
           style={{ borderRadius: 10 }}
         />
 
-        <Input.Password
-          prefix={
-            <Lock size={16} style={{ color: "var(--fn-text-quaternary)" }} />
-          }
-          placeholder={t("login.password")}
-          size="large"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          onPressEnter={handleLogin}
-          autoComplete="current-password"
-          name="password"
-          style={{ borderRadius: 10 }}
-        />
+        {remotePasswordHeld ? null : (
+          <Input.Password
+            prefix={
+              <Lock size={16} style={{ color: "var(--fn-text-quaternary)" }} />
+            }
+            placeholder={t("login.password")}
+            size="large"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onPressEnter={handleLogin}
+            autoComplete="current-password"
+            name="password"
+            style={{ borderRadius: 10 }}
+          />
+        )}
 
         {ldap?.enabled && (
           <p
@@ -860,7 +924,7 @@ export default function LoginPage() {
           block
           loading={loading}
           onClick={handleLogin}
-          disabled={!username || !password || !captchaReady}
+          disabled={!username || (!remotePasswordHeld && !password) || !captchaReady}
           style={{ borderRadius: 10, height: 44, fontWeight: 500 }}
         >
           {t("login.submit")}

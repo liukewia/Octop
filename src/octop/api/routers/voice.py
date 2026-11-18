@@ -23,6 +23,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from starlette.websockets import WebSocketState
 
+from octop.api.common.session_cookie import presented_access_token
 from octop.api.deps import (
     current_user,
     get_server,
@@ -294,6 +295,7 @@ async def stream_transcription(
     ``interim`` / ``final`` / ``done`` / ``error`` JSON messages.
     """
     server = websocket.app.state.octop_server
+    token = presented_access_token(token, websocket.cookies)
     if not token:
         await websocket.close(code=4001, reason="missing token")
         return

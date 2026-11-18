@@ -13,6 +13,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from starlette.websockets import WebSocketState
 
+from octop.api.common.session_cookie import presented_access_token
 from octop.api.deps import get_server, require_permission, resolve_user_from_token
 from octop.infra.errors import ErrorCode, OctopError
 from octop.infra.users.groups import RESOURCE_BRIDGE, GroupAccess
@@ -654,7 +655,7 @@ async def bridge_browser_stream_ws(
 ) -> None:
     """Dashboard screencast WS relayed to the peer browser harness."""
     server = websocket.app.state.octop_server
-    raw_token = websocket.query_params.get("token")
+    raw_token = presented_access_token(websocket.query_params.get("token"), websocket.cookies)
     if not raw_token:
         await websocket.close(code=4001, reason="missing token")
         return

@@ -9,6 +9,7 @@ All desktop-client code lives here. This is **not** `src/octop/infra/control/des
 | [`portable/`](portable/) | Green zip packaging |
 | [`docs/DESKTOP_ARCHITECTURE.zh.md`](docs/DESKTOP_ARCHITECTURE.zh.md) | Target architecture for the Electron shell |
 | [`docs/LOCAL_ACCOUNT_CLAIM.zh.md`](docs/LOCAL_ACCOUNT_CLAIM.zh.md) | Claim an existing local account when `OCTOP_HOME` already has users (not implemented) |
+| [`docs/REMOTE_BACKEND.zh.md`](docs/REMOTE_BACKEND.zh.md) | Optional host, username, and password to a remote Octop server |
 
 The Electron shell owns the whole desktop lifecycle: spawn Octop on a random
 loopback port, own tray/window chrome, refuse self-updates. The green runtime

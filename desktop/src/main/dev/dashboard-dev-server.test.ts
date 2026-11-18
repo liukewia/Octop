@@ -8,6 +8,7 @@ import {
   readDashboardDev,
   viteLaunch,
   waitForDevServer,
+  waitForOptimizedReact,
 } from "./dashboard-dev-server";
 
 test("开发模式没打开时不启动 Vite", () => {
@@ -63,6 +64,34 @@ test("Vite 只监听本机，并把接口代理到 sidecar 端口", () => {
   assert.equal(launch.env.VITE_HMR_CLIENT_PORT, "5173");
   assert.equal(launch.env.PATH, "/usr/bin");
   assert.equal(dashboardDevOrigin(5173), "http://127.0.0.1:5173");
+});
+
+test("窗口要等优化后的 React 可下载再打开", async () => {
+  let reactHits = 0;
+  const server = createServer((req, res) => {
+    if (req.url === "/src/main.tsx") {
+      res.writeHead(200, { "content-type": "text/javascript" }).end("export {}");
+      return;
+    }
+    if (req.url === "/node_modules/.vite/deps/react.js") {
+      reactHits += 1;
+      if (reactHits < 2) {
+        res.writeHead(404).end("optimizing");
+        return;
+      }
+      res.writeHead(200, { "content-type": "text/javascript" }).end("export {}");
+      return;
+    }
+    res.writeHead(500).end();
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+  const address = server.address() as AddressInfo;
+  try {
+    await waitForOptimizedReact(`http://127.0.0.1:${address.port}`, 2_000);
+    assert.equal(reactHits >= 2, true);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
 });
 
 test("开发服务器一有响应就继续启动", async () => {

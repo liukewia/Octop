@@ -4,6 +4,7 @@ import { test } from "node:test";
 
 import { resolveOctopHome, expandHome } from "./shell-env";
 import { resolveDashboardFile, resolveStaticPath, isExternalLink } from "../protocol/static-handler";
+import { loopbackTarget } from "../connection/target";
 import { isApiPath, toBackendUrl, sanitizeForwardHeaders } from "../protocol/stream-proxy";
 
 /**
@@ -75,8 +76,10 @@ test("isExternalLink only allows real http(s) links", () => {
 test("api path + backend url mapping", () => {
   assert.equal(isApiPath("/api/health"), true);
   assert.equal(isApiPath("/assets/app.js"), false);
-  assert.equal(toBackendUrl(4321, "/api/health", ""), "http://127.0.0.1:4321/api/health");
-  assert.equal(toBackendUrl(4321, "/api/agents", "?q=1"), "http://127.0.0.1:4321/api/agents?q=1");
+  const local = loopbackTarget(4321);
+  assert.ok(local);
+  assert.equal(toBackendUrl(local, "/api/health", ""), "http://127.0.0.1:4321/api/health");
+  assert.equal(toBackendUrl(local, "/api/agents", "?q=1"), "http://127.0.0.1:4321/api/agents?q=1");
 });
 
 test("sanitizeForwardHeaders strips connection-level headers", () => {

@@ -1,7 +1,9 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import { connect, type Socket } from "node:net";
+import { connect as tlsConnect, type ConnectionOptions } from "node:tls";
 
+import type { BackendTarget } from "../connection/target";
 import type { WsRelayEndpoint } from "../../shared/ipc-contract";
 import { isApiPath } from "./stream-proxy";
 
@@ -27,10 +29,29 @@ const MAX_HEAD_BYTES = 16 * 1024;
 const HANDSHAKE_TIMEOUT_MS = 5_000;
 
 export interface WsRelayOptions {
-  /** Current sidecar port, or 0 while it is down / being replaced. */
-  backendPort: () => number;
+  /** Current backend, or null while it is down / being replaced. */
+  backend: () => BackendTarget | null;
   /** Origin the shell's own pages report, e.g. ``octop://app``. */
   allowedOrigin: string;
+  /**
+   * Other origins this shell itself navigates to. Dev hot reload uses a
+   * loopback Vite origin while a remote session stays on ``octop://app``.
+   */
+  extraOrigins?: readonly string[];
+}
+
+/** Dial options for one backend. Remote targets verify the certificate. */
+export function upstreamOptions(
+  target: BackendTarget,
+): { tls: false; host: string; port: number } | (ConnectionOptions & { tls: true }) {
+  if (!target.tls) return { tls: false, host: target.host, port: target.port };
+  return {
+    tls: true,
+    host: target.host,
+    port: target.port,
+    servername: target.host,
+    rejectUnauthorized: true,
+  };
 }
 
 /** Constant-time compare that does not leak the length of the expected token. */
@@ -135,13 +156,17 @@ export class WsRelay {
     }
     // A browser always sends Origin on a WebSocket; requiring the shell's own
     // origin keeps a random page from borrowing this port.
-    if ((req.headers.origin ?? "") !== this.options.allowedOrigin) {
+    const origin = req.headers.origin ?? "";
+    const allowed =
+      origin === this.options.allowedOrigin ||
+      (this.options.extraOrigins?.includes(origin) ?? false);
+    if (!allowed) {
       reject(client, 403, "Forbidden", "unexpected origin");
       return;
     }
 
-    const port = this.options.backendPort();
-    if (!port) {
+    const backend = this.options.backend();
+    if (!backend) {
       reject(client, 503, "Service Unavailable", "backend not ready");
       return;
     }
@@ -153,7 +178,15 @@ export class WsRelay {
       return;
     }
 
-    const upstream = connect({ host: "127.0.0.1", port });
+    const dial = upstreamOptions(backend);
+    const upstream = dial.tls
+      ? tlsConnect({
+          host: dial.host,
+          port: dial.port,
+          servername: dial.servername,
+          rejectUnauthorized: true,
+        })
+      : connect({ host: dial.host, port: dial.port });
     upstream.setNoDelay(true);
     this.sockets.add(upstream);
 
@@ -168,21 +201,27 @@ export class WsRelay {
       client.destroy();
     });
 
-    // An unreachable sidecar must not hang the page's reconnect loop.
+    // An unreachable backend must not hang the page's reconnect loop.
+    let ready = false;
     const timer = setTimeout(() => {
-      if (upstream.connecting) {
+      if (!ready) {
         reject(client, 504, "Gateway Timeout", "backend unreachable");
         teardown();
       }
     }, HANDSHAKE_TIMEOUT_MS);
-    upstream.once("connect", () => clearTimeout(timer));
+    const markReady = () => {
+      ready = true;
+      clearTimeout(timer);
+    };
+    if (dial.tls) upstream.once("secureConnect", markReady);
+    else upstream.once("connect", markReady);
 
     const headers = [
       `${req.method ?? "GET"} ${target.path}${target.search} HTTP/1.1`,
-      `Host: 127.0.0.1:${port}`,
+      `Host: ${backend.hostHeader}`,
       "Connection: Upgrade",
       "Upgrade: websocket",
-      `Origin: http://127.0.0.1:${port}`,
+      `Origin: ${backend.origin}`,
       "x-octop-proxy: 1",
     ];
     for (const [header, canonical] of FORWARD_REQUEST_HEADERS) {

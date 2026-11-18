@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import CloseIcon from "../../../../dashboard/src/assets/window-controls/close.svg?react";
 import MaximizeIcon from "../../../../dashboard/src/assets/window-controls/maximize.svg?react";
 import MinimizeIcon from "../../../../dashboard/src/assets/window-controls/minimize.svg?react";
@@ -25,6 +26,7 @@ function linuxDesktop(): boolean {
  * Same 46×32 rectangles as the dashboard: no radius, close turns red.
  */
 export function LinuxWindowControls() {
+  const { t } = useTranslation();
   const [maximized, setMaximized] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const shown = linuxDesktop();
@@ -52,14 +54,14 @@ export function LinuxWindowControls() {
   const controls = window.octopDesktop?.windowControls;
 
   return (
-    <div className={styles.controls} role="group" aria-label="窗口控制">
-      <button type="button" title="最小化" aria-label="最小化" onClick={() => controls?.minimize()}>
+    <div className={styles.controls} role="group" aria-label={t("window.controls")}>
+      <button type="button" title={t("window.minimize")} aria-label={t("window.minimize")} onClick={() => controls?.minimize()}>
         <CaptionGlyph kind="minimize" />
       </button>
       <button
         type="button"
-        title={maximized ? "还原" : "最大化"}
-        aria-label={maximized ? "还原" : "最大化"}
+        title={maximized ? t("window.restore") : t("window.maximize")}
+        aria-label={maximized ? t("window.restore") : t("window.maximize")}
         onClick={() => controls?.toggleMaximize()}
       >
         <CaptionGlyph kind={maximized ? "restore" : "maximize"} />
@@ -67,8 +69,8 @@ export function LinuxWindowControls() {
       <button
         type="button"
         className={styles.close}
-        title="关闭"
-        aria-label="关闭"
+        title={t("window.close")}
+        aria-label={t("window.close")}
         onClick={() => controls?.close()}
       >
         <CaptionGlyph kind="close" />

@@ -40,6 +40,7 @@ from typing import Any
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 from starlette.websockets import WebSocketState
 
+from octop.api.common.session_cookie import presented_access_token
 from octop.api.deps import resolve_user_from_token
 from octop.api.routers.browser.harness import (
     control_owner_for,
@@ -393,6 +394,7 @@ async def browser_stream_ws(
     height: int = Query(default=800),
 ) -> None:
     server = websocket.app.state.octop_server
+    token = presented_access_token(token, websocket.cookies)
     if not token:
         await websocket.close(code=4001, reason="missing token")
         return

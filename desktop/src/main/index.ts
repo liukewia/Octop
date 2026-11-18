@@ -14,7 +14,7 @@ import {
   type WebContents,
 } from "electron";
 import { execFileSync, spawn } from "node:child_process";
-import { constants as fsConstants, existsSync, promises as fs } from "node:fs";
+import { constants as fsConstants, existsSync, mkdirSync, promises as fs, rmSync, writeFileSync } from "node:fs";
 import { type as osType, release as osRelease } from "node:os";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -22,10 +22,12 @@ import { pathToFileURL } from "node:url";
 import {
   IPC_CHANNELS,
   type ClientSettings,
+  type ConnectionWriteResult,
   type IssuedSession,
   type PlatformInfo,
   type UpdateCheckResult,
 } from "../shared/ipc-contract";
+import { changeShellLanguage, shellT } from "../shared/shell-i18n";
 import { resolveAppVersion } from "./app-version";
 import { desktopLog, installDesktopLog } from "./log/desktop-log";
 import { DeviceCredentialStore } from "./session/device-credential";
@@ -47,6 +49,9 @@ import { compareVersions } from "./supervisor/version";
 import { sha256File } from "./supervisor/sha256";
 import { buildSidecarEnv } from "./supervisor/process-tree";
 import { SidecarSupervisor } from "./supervisor/sidecar";
+import { ConnectionController } from "./connection/controller";
+import { pageRelayEndpoint, remotePageUrl } from "./connection/web-credential";
+import { isRedirectStatus, loopbackTarget } from "./connection/target";
 import { contentTypeFor, isExternalLink, resolveDashboardFile, resolveStaticPath } from "./protocol/static-handler";
 import { isApiPath, sanitizeForwardHeaders, toBackendUrl } from "./protocol/stream-proxy";
 import { WsRelay } from "./protocol/ws-relay";
@@ -73,13 +78,21 @@ import {
   windowsInstallScope,
 } from "./windows/about-info";
 import {
+  macApplicationMenu,
   windowsApplicationMenu,
   windowsMenuCommandId,
   windowsMenuModel,
   type WindowsMenuCommandId,
 } from "./windows/app-menu";
 import { createEarlyWindow } from "./windows/early-window";
+import {
+  commitLoginItem,
+  linuxAutostartDir,
+  planLoginItem,
+  shouldStartHidden,
+} from "./windows/login-item";
 import { createMainWindow, installDashboardGuards } from "./windows/main-window";
+import { armWebCredential, applySetCookies } from "./windows/web-credential";
 import type { EarlyWindow } from "./windows/early-window";
 import { isWindowOnScreen, presentWindows, shouldKeepWindowOnClose } from "./windows/present";
 import {
@@ -94,6 +107,7 @@ import {
   applyNativeTheme,
   applyWindowChromeTheme,
   dashboardEntryUrl,
+  isAppNavigation,
   PACKAGED_APP_ORIGIN,
   parseWindowChromeTheme,
   resolveWindowChromeTheme,
@@ -108,6 +122,7 @@ const WINDOW_ORIGIN = "octop://app";
 const PRELOAD_PATH = join(__dirname, "../preload/index.js");
 const SPLASH_PATH = join(__dirname, "../renderer/splash.html");
 const ERROR_PATH = join(__dirname, "../renderer/error.html");
+const CONNECT_PATH = join(__dirname, "../renderer/connect.html");
 
 interface PortableManifestFile {
   version: string;
@@ -119,6 +134,13 @@ let settingsStore: ClientSettingsStore;
 // §7 accounts: renews the Dashboard session without a password. Registered by
 // the renderer once it holds a JWT; used whenever that JWT has expired.
 let deviceSession: DeviceSessionClient | null = null;
+let connection: ConnectionController | null = null;
+let bootWindow: EarlyWindow | null = null;
+/** Bumped to abandon an in-flight local sidecar start (the user opened the cloud form). */
+let localBootToken = 0;
+/** Bumped when the user leaves an in-flight cloud login for the local sidecar or the form. */
+let remoteBootToken = 0;
+let connectFormRequested = false;
 // Resolved after `whenReady` — `app.getVersion()` must not run at module load.
 let appVersion = "";
 // §6.3 step 1: once an install is under way the proxy answers 503 so no new API
@@ -253,16 +275,23 @@ function registerProtocol(staticRootDir: string): void {
 
     if (isApiPath(pathname)) {
       if (apiAdmissionClosed) return new Response("update in progress", { status: 503 });
-      const target = toBackendUrl(backendPort, pathname, url.search);
+      const backend = currentBackend();
+      if (!backend) return new Response("backend not ready", { status: 503 });
+      const target = toBackendUrl(backend, pathname, url.search);
       const headers = sanitizeForwardHeaders(request.headers);
       headers["x-octop-proxy"] = "1";
-      return net.fetch(target, {
+      const upstream = await net.fetch(target, {
         method: request.method,
         headers,
+        redirect: "manual",
         body: ["GET", "HEAD"].includes(request.method) ? undefined : request.body,
         // @ts-expect-error duplex is required for streaming request bodies in undici
         duplex: "half",
       });
+      if (isRedirectStatus(upstream.status)) {
+        return new Response("redirect refused", { status: 502 });
+      }
+      return upstream;
     }
 
     // Escape stays forbidden. A client route with no file falls back to
@@ -315,7 +344,7 @@ async function showShellMessage(
   message: string,
   detail: string,
 ): Promise<void> {
-  const options = { type: "info" as const, buttons: ["好"], message, detail, noLink: true };
+  const options = { type: "info" as const, buttons: [shellT("connection.ok")], message, detail, noLink: true };
   if (win) await dialog.showMessageBox(win, options);
   else await dialog.showMessageBox(options);
 }
@@ -327,7 +356,7 @@ async function showShellError(
 ): Promise<void> {
   const options = {
     type: "error" as const,
-    buttons: ["好"],
+    buttons: [shellT("connection.ok")],
     message,
     detail,
     noLink: true,
@@ -356,8 +385,12 @@ async function handOffToInstaller(kind: InstallerKind, path: string): Promise<vo
 /** Stop Python cleanly and restart it when the installer never took over. */
 async function restartBackend(win: BrowserWindow | null): Promise<void> {
   apiAdmissionClosed = false;
+  if (connection?.backend()) {
+    win?.webContents.reload();
+    return;
+  }
   const ready = await startBackend();
-  if (ready) win?.webContents.reload();
+  if (ready === "ready") win?.webContents.reload();
 }
 
 async function runShellUpdate(
@@ -440,6 +473,13 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.clientSettingsSet, (_e, patch: Partial<ClientSettings>) => {
     const saved = settingsStore.save(patch);
     closeBehavior = saved.closeBehavior;
+    try {
+      syncLoginItem(saved);
+    } catch (err) {
+      desktopLog().warn(
+        `login item update failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
     return saved;
   });
 
@@ -447,7 +487,8 @@ function registerIpcHandlers(): void {
   // paths and cannot await (§5.2). Answers null (never the sidecar port) while
   // no relay is listening.
   ipcMain.on(IPC_CHANNELS.wsEndpoint, (event) => {
-    event.returnValue = wsRelay?.endpoint ?? null;
+    // A cloud page is a normal browser tab: its WebSockets go to that host.
+    event.returnValue = pageRelayEndpoint(connection?.view().mode ?? "local", wsRelay?.endpoint ?? null);
   });
 
   ipcMain.handle(IPC_CHANNELS.checkForUpdates, async (): Promise<UpdateCheckResult> => {
@@ -487,17 +528,17 @@ function registerIpcHandlers(): void {
     try {
       selected = await resolveSelectedRelease();
     } catch (err) {
-      await showShellError(win, "检查更新失败", errorMessageOf(err));
+      await showShellError(win, shellT("connection.updateCheckFailed"), errorMessageOf(err));
       return;
     }
     if (!selected) {
-      await showShellMessage(win, "已是最新版本", `当前版本 ${appVersion}。`);
+      await showShellMessage(win, shellT("connection.upToDateTitle"), shellT("connection.upToDate", { version: appVersion }));
       return;
     }
 
     const outcome = await runShellUpdate(win, selected);
     if (!outcome.ok) {
-      await showShellError(win, "升级失败", outcome.message);
+      await showShellError(win, shellT("connection.updateFailed"), outcome.message);
       return;
     }
     // §6.3 step 3: the installer owns the rest — hand it our exit.
@@ -505,12 +546,89 @@ function registerIpcHandlers(): void {
   });
 
   ipcMain.handle(IPC_CHANNELS.sessionRegister, (_event, accessToken: unknown): Promise<boolean> => {
+    if (connection?.backend()) return Promise.resolve(false);
     if (!isUsableAccessToken(accessToken)) return Promise.resolve(false);
     return deviceSession?.register(accessToken) ?? Promise.resolve(false);
   });
 
   ipcMain.handle(IPC_CHANNELS.sessionRenew, (): Promise<IssuedSession | null> => {
+    if (connection?.backend()) return connection.renew();
     return deviceSession?.renew() ?? Promise.resolve(null);
+  });
+
+  ipcMain.on(IPC_CHANNELS.sessionTakeRemote, (event) => {
+    event.returnValue = connection?.takeHandoff() ?? null;
+  });
+
+  ipcMain.on(IPC_CHANNELS.connectionConsumeReset, (event) => {
+    event.returnValue = connection?.consumeReset() ?? false;
+  });
+
+  ipcMain.handle(IPC_CHANNELS.connectionGet, () => {
+    return (
+      connection?.view() ?? {
+        mode: "local" as const,
+        origin: "",
+        username: "",
+        hasPassword: false,
+        versionWarning: null,
+      }
+    );
+  });
+
+  ipcMain.handle(IPC_CHANNELS.connectionSet, (_event, input: unknown) => {
+    return connection?.apply(input) ?? Promise.resolve({ ok: false, error: shellT("connection.notReady") });
+  });
+
+  ipcMain.handle(IPC_CHANNELS.connectionClear, () => {
+    return connection?.clear().then(() => ({ ok: true })) ?? Promise.resolve({ ok: false, error: shellT("connection.notReady") });
+  });
+
+  ipcMain.handle(IPC_CHANNELS.connectionConnect, async (): Promise<ConnectionWriteResult> => {
+    if (!connection) return { ok: false, error: shellT("connection.notReady") };
+    const result = await connection.connect();
+    if (!result.ok) return { ok: false, error: result.error, detail: result.detail };
+    const warning = connection.view().versionWarning;
+    if (warning) desktopLog().info(`[desktop] ${warning}`);
+    const early = bootWindow;
+    if (early) await openRemoteWeb(early, connection.view().origin, connection.webAccessToken(), connection.webCookies());
+    return { ok: true };
+  });
+
+  ipcMain.handle(IPC_CHANNELS.connectionOpenForm, async () => {
+    connectFormRequested = true;
+    leaveRemoteBoot();
+    cancelLocalBoot();
+    showConnectPage();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.connectionUseLocal, async (): Promise<ConnectionWriteResult> => {
+    connectFormRequested = false;
+    leaveRemoteBoot();
+    await connection?.clear();
+    const started = await startBackend();
+    if (connectFormRequested || started === "cancelled") return { ok: false, error: shellT("connection.cancelled") };
+    if (started !== "ready") {
+      bootWindow?.showError({
+        message: shellT("connection.pythonFailed"),
+        detail: errorDetail(backend ? shellT("connection.launcher", { script: backend.launchScript }) : undefined),
+      });
+      return { ok: false, error: shellT("connection.localDidNotStart") };
+    }
+    const early = bootWindow;
+    if (early) continueInEarlyWindow(early, dashboardOriginForBoot());
+    return { ok: true };
+  });
+
+  ipcMain.handle(IPC_CHANNELS.connectionLoginRemote, (_event, input: unknown) => {
+    const parsed = readRemoteLogin(input);
+    if (!parsed) return Promise.resolve({ ok: false, error: shellT("connection.badLogin") });
+    return connection?.complete(parsed) ?? Promise.resolve({ ok: false, error: shellT("connection.notReady") });
+  });
+
+  ipcMain.handle(IPC_CHANNELS.connectionRelaunch, () => {
+    app.relaunch();
+    app.exit(0);
   });
 
   ipcMain.handle(IPC_CHANNELS.sessionRevoke, (_event, accessToken: unknown): Promise<boolean> => {
@@ -536,14 +654,16 @@ function registerIpcHandlers(): void {
 /** Append the desktop log path so a packaged failure says where to look. */
 function errorDetail(detail?: string): string | undefined {
   const path = desktopLog().path;
-  const text = [detail, path ? `日志: ${path}` : ""].filter((line) => line).join("\n");
+  const text = [detail, path ? shellT("connection.logPath", { path }) : ""].filter((line) => line).join("\n");
   return text || undefined;
 }
 
 /** Spawn the Python sidecar on a fresh loopback port and wait for health. */
-async function startBackend(): Promise<boolean> {
-  if (!backend) return false;
+async function startBackend(): Promise<"ready" | "failed" | "cancelled"> {
+  if (!backend) return "failed";
+  const token = ++localBootToken;
   const port = await reserveRandomPort();
+  if (token !== localBootToken) return "cancelled";
   const env = buildSidecarEnv(process.env, {
     octopHome: backend.octopHome,
     portableDir: backend.portableDir,
@@ -573,6 +693,12 @@ async function startBackend(): Promise<boolean> {
   desktopLog().info(`starting sidecar on 127.0.0.1:${port}`);
   sidecar.start();
   const ready = await sidecar.waitUntilReady();
+  if (token !== localBootToken) {
+    backendPort = 0;
+    if (supervisor === sidecar) supervisor = null;
+    if (sidecar.isRunning()) void sidecar.stop();
+    return "cancelled";
+  }
   if (!ready) {
     desktopLog().error(`sidecar was not ready on 127.0.0.1:${port}`);
     // The exit handler already kept the tail when the process died. A timeout
@@ -582,7 +708,65 @@ async function startBackend(): Promise<boolean> {
       if (tail) desktopLog().error(tail);
     }
   }
-  return ready;
+  return ready ? "ready" : "failed";
+}
+
+function currentBackend() {
+  if (apiAdmissionClosed) return null;
+  return connection?.backend() ?? loopbackTarget(backendPort);
+}
+
+function leaveRemoteBoot(): void {
+  remoteBootToken += 1;
+  connection?.cancelConnect();
+}
+
+function cancelLocalBoot(): void {
+  localBootToken += 1;
+  backendPort = 0;
+  const sidecar = supervisor;
+  supervisor = null;
+  if (sidecar) void sidecar.stop();
+}
+
+function showConnectPage(message = ""): void {
+  const win = bootWindow?.browserWindow;
+  if (!win || win.isDestroyed()) return;
+  const view = connection?.view();
+  const theme = resolveWindowChromeTheme(settingsStore.load().themeBackground);
+  void win.loadFile(CONNECT_PATH, {
+    query: {
+      theme: theme.mode,
+      origin: view?.origin ?? "",
+      username: view?.username ?? "",
+      message,
+    },
+  });
+}
+
+function readRemoteLogin(input: unknown): {
+  captchaToken?: string;
+  mfaCode?: string;
+  method?: "totp" | "recovery";
+} | null {
+  if (input == null) return {};
+  if (typeof input !== "object") return null;
+  const body = input as Record<string, unknown>;
+  if (body.captchaToken !== undefined && typeof body.captchaToken !== "string") return null;
+  if (body.mfaCode !== undefined && typeof body.mfaCode !== "string") return null;
+  if (typeof body.captchaToken === "string" && body.captchaToken.length > 4096) return null;
+  if (typeof body.mfaCode === "string" && body.mfaCode.length > 64) return null;
+  const method = body.method === "recovery" || body.method === "totp" ? body.method : undefined;
+  return {
+    captchaToken: typeof body.captchaToken === "string" ? body.captchaToken : undefined,
+    mfaCode: typeof body.mfaCode === "string" ? body.mfaCode : undefined,
+    method,
+  };
+}
+
+function dashboardOriginForBoot(): string {
+  const dashboardDev = app.isPackaged ? null : readDashboardDev(process.env);
+  return dashboardDev ? dashboardDevOrigin(dashboardDev.port) : PACKAGED_APP_ORIGIN;
 }
 
 function openExternal(url: string): void {
@@ -652,7 +836,43 @@ function openDashboardWindow(appOrigin: string): BrowserWindow {
   return win;
 }
 
-/** Keep the splash window and load the Dashboard into it. */
+/**
+ * Cloud mode: the window is a browser for that origin. The JWT is written
+ * into the page before its scripts run. The packaged Dashboard is not loaded.
+ */
+async function openRemoteWeb(
+  early: EarlyWindow,
+  origin: string,
+  token: string | null,
+  cookies: readonly string[],
+): Promise<void> {
+  if (!origin) {
+    showConnectPage(shellT("connection.savedHostInvalid"));
+    return;
+  }
+  const win = early.browserWindow;
+  if (win.isDestroyed()) return;
+  dashboardOrigin = origin;
+  watchDashboardLifetime(win);
+  watchLinuxCaptionState(win);
+  const chromeTheme = resolveWindowChromeTheme(settingsStore.load().themeBackground);
+  const entry = remotePageUrl(origin, chromeTheme.scheme ?? chromeTheme.mode);
+  try {
+    if (cookies.length > 0) await applySetCookies(win.webContents.session, origin, cookies);
+    if (token) await armWebCredential(win.webContents, origin, token);
+    if (win.isDestroyed()) return;
+    win.webContents.once("did-navigate", (_event, url) => {
+      if (!isAppNavigation(url, origin)) return;
+      installDashboardGuards(win, { appOrigin: origin, onNavigate: openExternal });
+    });
+    await win.loadURL(entry);
+  } catch (err) {
+    desktopLog().error(`remote page failed: ${errorMessageOf(err)}`);
+    if (!win.isDestroyed()) showConnectPage(shellT("connection.cannotConnect"));
+  }
+}
+
+/** Keep the splash window and load the local Dashboard into it. */
 function continueInEarlyWindow(early: EarlyWindow, appOrigin: string): void {
   dashboardOrigin = appOrigin;
   const win = early.browserWindow;
@@ -780,15 +1000,45 @@ function runWindowsMenuCommand(win: BrowserWindow, command: WindowsMenuCommandId
     case "about":
       showAboutDialog(appVersion);
       return;
+    case "connection":
+      openConnectionFromMenu();
+      return;
   }
 }
 
-/** Caption menu on Windows and Linux. macOS keeps the system menu bar. */
-function installWindowsAppMenu(version: string): void {
+/** Caption menu on Windows and Linux. macOS keeps a system menu bar with the same cloud-instance item. */
+function installApplicationMenu(version: string): void {
+  const onConnection = () => openConnectionFromMenu();
+  if (process.platform === "darwin") {
+    Menu.setApplicationMenu(Menu.buildFromTemplate(macApplicationMenu(app.getLocale(), onConnection)));
+    return;
+  }
   if (!usesCaptionOverlay()) return;
   Menu.setApplicationMenu(
-    Menu.buildFromTemplate(windowsApplicationMenu(app.getLocale(), () => showAboutDialog(version))),
+    Menu.buildFromTemplate(
+      windowsApplicationMenu(app.getLocale(), () => showAboutDialog(version), onConnection),
+    ),
   );
+}
+
+function shellDashboardUrl(url: string): boolean {
+  return (
+    url.startsWith("octop://") ||
+    url.startsWith("http://127.0.0.1") ||
+    url.startsWith("http://localhost")
+  );
+}
+
+/** Octop menu → 云端实例. Our dashboard opens its dialog; any other page gets the shell form. */
+function openConnectionFromMenu(): void {
+  const win = BrowserWindow.getFocusedWindow() ?? bootWindow?.browserWindow ?? null;
+  if (!win || win.isDestroyed()) return;
+  win.show();
+  if (shellDashboardUrl(win.webContents.getURL())) {
+    win.webContents.send(IPC_CHANNELS.connectionOpenMenu);
+    return;
+  }
+  showConnectPage();
 }
 
 function readGitStamp(args: readonly string[]): string | null {
@@ -885,7 +1135,34 @@ function destroySystemTray(): void {
   trayIcon = null;
 }
 
+/** Project the stored login preference onto the OS. macOS and Windows use Electron; Linux uses XDG autostart. */
+function syncLoginItem(settings: ClientSettings): void {
+  const plan = planLoginItem({
+    platform: process.platform,
+    launchAtLogin: settings.launchAtLogin,
+    launchWithoutWindow: settings.launchWithoutWindow,
+    execPath: process.execPath,
+    appPath: app.getAppPath(),
+    packaged: app.isPackaged,
+    autostartDir: linuxAutostartDir(app.getPath("home"), process.env.XDG_CONFIG_HOME),
+  });
+  commitLoginItem(plan, {
+    setElectronLoginItem: (item) => app.setLoginItemSettings(item),
+    mkdir: (path) => mkdirSync(path, { recursive: true }),
+    writeFile: (path, contents) => writeFileSync(path, contents, "utf8"),
+    removeFile: (path) => {
+      try {
+        rmSync(path);
+      } catch (err) {
+        const code = err instanceof Error && "code" in err ? (err as NodeJS.ErrnoException).code : undefined;
+        if (code !== "ENOENT") throw err;
+      }
+    },
+  });
+}
+
 async function boot(): Promise<void> {
+  changeShellLanguage(app.getLocale());
   const gotLock = app.requestSingleInstanceLock();
   if (!gotLock) {
     app.quit();
@@ -897,11 +1174,18 @@ async function boot(): Promise<void> {
   }
 
   appVersion = await resolveProductVersion();
-  installWindowsAppMenu(appVersion);
+  installApplicationMenu(appVersion);
 
   settingsStore = new ClientSettingsStore(defaultClientSettingsPath(app.getPath("userData")));
   const settings = settingsStore.load();
   closeBehavior = settings.closeBehavior;
+  const openedHidden = shouldStartHidden({
+    platform: process.platform,
+    argv: process.argv,
+    wasOpenedAtLogin:
+      process.platform === "darwin" ? app.getLoginItemSettings().wasOpenedAtLogin === true : false,
+    launchWithoutWindow: settings.launchWithoutWindow,
+  });
   // Apply the source before resolving, so a stored "system" reads the OS
   // preference rather than whatever an earlier explicit source left behind.
   applyNativeTheme({
@@ -918,7 +1202,9 @@ async function boot(): Promise<void> {
     // BrowserWindow cannot swap its preload.
     preload: PRELOAD_PATH,
     theme: chromeTheme,
+    showWhenReady: !openedHidden,
   });
+  bootWindow = early;
   watchLinuxCaptionState(early.browserWindow);
 
   // Resolve OCTOP_HOME, reading the login shell on macOS/Linux (GUI apps don't
@@ -928,7 +1214,18 @@ async function boot(): Promise<void> {
   const octopHome = resolveOctopHome(process.env, loginShellEnv);
   installDesktopLog(octopHome);
   desktopLog().info(`desktop ${appVersion} home=${octopHome}`);
+  try {
+    syncLoginItem(settings);
+  } catch (err) {
+    desktopLog().warn(
+      `login item update failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
   await installSystemTray();
+  // A hidden login launch with no tray icon would leave the window unreachable.
+  if (openedHidden && shouldInstallSystemTray(process.platform) && tray === null) {
+    if (!early.browserWindow.isDestroyed()) early.browserWindow.show();
+  }
 
   // Local dev escape hatch: point at an already-extracted runtime (e.g. the one
   // `pnpm dev:runtime` writes to .dev-runtime) and skip bundling/extraction.
@@ -958,8 +1255,11 @@ async function boot(): Promise<void> {
       );
       if (decision.action === "stop") {
         early.showError({
-          message: `检测到本机运行时版本为 ${decision.localVersion}，当前安装的是 ${bundled.version}。这是手动覆盖安装的旧版，已停止启动，并保留了现有运行时。`,
-          detail: errorDetail(`运行时目录: ${portableDir}`),
+          message: shellT("connection.runtimeTooNew", {
+            localVersion: decision.localVersion,
+            bundledVersion: bundled.version,
+          }),
+          detail: errorDetail(shellT("connection.runtimeDir", { dir: portableDir })),
         });
         return;
       }
@@ -970,8 +1270,10 @@ async function boot(): Promise<void> {
         if (digest !== bundled.sha256) {
           desktopLog().error(`portable zip sha256 mismatch file=${zip}`);
           early.showError({
-            message: "随包运行时校验失败（SHA-256 不匹配），为避免执行被篡改的文件，已停止启动。",
-            detail: errorDetail(`文件: ${zip}\n期望: ${bundled.sha256}\n实际: ${digest}`),
+            message: shellT("connection.checksumFailed"),
+            detail: errorDetail(
+              shellT("connection.checksumDetail", { file: zip, expected: bundled.sha256, actual: digest }),
+            ),
           });
           return;
         }
@@ -982,7 +1284,7 @@ async function boot(): Promise<void> {
       const detail = err instanceof Error ? err.message : String(err);
       desktopLog().error(`portable runtime preparation failed: ${detail}`);
       early.showError({
-        message: "准备便携运行时（解压或校验）时出错，已停止启动。",
+        message: shellT("connection.portableFailed"),
         detail: errorDetail(detail),
       });
       return;
@@ -1014,7 +1316,14 @@ async function boot(): Promise<void> {
     store: credentialStore,
     baseUrl: () => (apiAdmissionClosed || !backendPort ? null : `http://127.0.0.1:${backendPort}`),
     label: `${process.platform}-${process.arch}`,
+    active: () => connection?.backend() == null,
   });
+  connection = new ConnectionController({
+    home: octopHome,
+    cipher,
+    shellVersion: appVersion,
+  });
+  await connection.load();
 
   registerProtocol(dashboardRoot(portableDir));
   registerIpcHandlers();
@@ -1023,10 +1332,14 @@ async function boot(): Promise<void> {
   // A bind failure must not abort the launch — the Dashboard then finds no
   // endpoint and falls back to its page-origin URLs, i.e. no live streams.
   const dashboardDev = app.isPackaged ? null : readDashboardDev(process.env);
-  const windowOrigin = dashboardDev ? dashboardDevOrigin(dashboardDev.port) : WINDOW_ORIGIN;
+  const devOrigin = dashboardDev ? dashboardDevOrigin(dashboardDev.port) : null;
+  // Remote mode opens the server's own page, so it does not use this relay.
+  // Local hot reload still dials from the Vite origin, so the relay accepts both.
+  const windowOrigin = devOrigin ?? WINDOW_ORIGIN;
   wsRelay = new WsRelay({
-    backendPort: () => (apiAdmissionClosed || !backendPort ? 0 : backendPort),
-    allowedOrigin: windowOrigin,
+    backend: () => currentBackend(),
+    allowedOrigin: WINDOW_ORIGIN,
+    extraOrigins: devOrigin ? [devOrigin] : undefined,
   });
   try {
     await wsRelay.start();
@@ -1035,12 +1348,31 @@ async function boot(): Promise<void> {
     wsRelay = null;
   }
 
+  if (connection.view().mode === "remote") {
+    const view = connection.view();
+    desktopLog().info(`[desktop] remote backend ${view.origin || "(invalid origin)"}`);
+    const token = remoteBootToken;
+    const result = await connection.connect();
+    if (token !== remoteBootToken || connectFormRequested) return;
+    if (!result.ok) {
+      showConnectPage(result.error);
+      return;
+    }
+    const warning = connection.view().versionWarning;
+    if (warning) desktopLog().info(`[desktop] ${warning}`);
+    await openRemoteWeb(early, connection.view().origin, connection.webAccessToken(), connection.webCookies());
+    return;
+  }
+
+  if (connectFormRequested) return;
+
   const ready = await startBackend();
-  if (!ready) {
+  if (connectFormRequested || ready === "cancelled") return;
+  if (ready !== "ready") {
     early.showError({
-      message: "Python 后端未能就绪（健康检查超时或进程提前退出）。请查看日志后重试。",
+      message: shellT("connection.pythonFailed"),
         detail: errorDetail(
-          backend ? `启动器: ${backend.launchScript}\n端口: 127.0.0.1:${backendPort}` : undefined,
+          backend ? shellT("connection.launcherPort", { script: backend.launchScript, port: backendPort }) : undefined,
         ),
     });
     return;
@@ -1058,7 +1390,7 @@ async function boot(): Promise<void> {
       const detail = err instanceof Error ? err.message : String(err);
       desktopLog().error(`dashboard dev server failed: ${detail}`);
       early.showError({
-        message: "仪表盘开发服务器没有起来，页面无法热更新。",
+        message: shellT("connection.devServerFailed"),
         detail: errorDetail(detail),
       });
       return;

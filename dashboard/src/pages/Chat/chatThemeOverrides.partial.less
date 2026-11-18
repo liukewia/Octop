@@ -101,17 +101,23 @@
   box-sizing: border-box;
 }
 
-/* Only the full-height history rail owns a window-top search row. Embedded
-   minimal navigation and mobile overlays keep their existing spacing. */
+/* The history rail's first row shares the chat title bar's band. Search owns
+   it when there are experts; otherwise the scope tabs do. Embedded minimal
+   navigation and mobile overlays keep their existing spacing. */
 @media (min-width: 768px) {
   .sidebar > .sessionList {
     padding-top: 0;
 
-    > .sessionHeaderRow {
+    > .sessionHeaderRow,
+    > .sessionChromeRow {
       box-sizing: border-box;
       height: var(--fn-chat-chrome-height, 58px);
       margin: 0 0 0 -12px;
       padding: 0 12px;
+    }
+
+    > .sessionChromeRow {
+      margin-bottom: 10px;
     }
   }
 }

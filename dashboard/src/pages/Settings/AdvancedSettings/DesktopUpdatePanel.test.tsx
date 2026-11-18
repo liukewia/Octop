@@ -16,6 +16,7 @@ beforeEach(() => {
     clientSettings: {
       get: vi.fn().mockResolvedValue({
         launchAtLogin: false,
+        launchWithoutWindow: false,
         closeBehavior: "quit",
         themeBackground: "system",
         stableOnly: true,

@@ -16,6 +16,11 @@ from typing import Any
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
+from octop.api.common.session_cookie import (
+    SESSION_COOKIE,
+    maybe_attach_session_cookie,
+    set_session_cookie,
+)
 from octop.api.deps import (
     ACCESS_TOKEN_RESPONSE_HEADER,
     authenticate_request,
@@ -42,11 +47,13 @@ def install(app: Any, server: Any) -> None:
     ) -> Any:
         path = request.url.path
         if not path.startswith("/api/") or is_jwt_exempt_request(request):
-            return await call_next(request)
+            response = await call_next(request)
+            return await maybe_attach_session_cookie(request, response)
 
         raw = extract_raw_token(
             authorization=request.headers.get("authorization"),
             access_token=request.query_params.get("access_token"),
+            cookie=request.cookies.get(SESSION_COOKIE),
         )
         try:
             request.state.octop_user = authenticate_request(request, server)
@@ -69,6 +76,13 @@ def install(app: Any, server: Any) -> None:
                 renewed = maybe_sliding_renew_token(server, raw, request.state.octop_user)
             except OctopError:
                 renewed = None
-            if renewed:
+            if renewed and request.url.path != "/api/auth/logout":
                 response.headers[ACCESS_TOKEN_RESPONSE_HEADER] = renewed
-        return response
+                ttl = 0
+                services = getattr(server, "services", None)
+                config = getattr(services, "config", None) if services is not None else None
+                if config is not None:
+                    ttl = int(getattr(config, "access_token_ttl_seconds", 0) or 0)
+                if ttl > 0:
+                    set_session_cookie(response, request, renewed, ttl)
+        return await maybe_attach_session_cookie(request, response)

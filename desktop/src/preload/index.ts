@@ -2,8 +2,11 @@ import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 import {
   IPC_CHANNELS,
   type ClientSettings,
+  type ConnectionView,
+  type ConnectionWriteResult,
   type IssuedSession,
   type PlatformInfo,
+  type RemoteHandoff,
   type UpdateCheckResult,
   type WindowChromeTheme,
   type WsRelayEndpoint,
@@ -100,8 +103,8 @@ const bridge = {
     },
   },
   /**
-   * Where to dial WebSockets (§5.2). ``null`` when the shell has no relay, in
-   * which case the Dashboard keeps deriving the address from the page origin.
+   * Where to dial WebSockets (§5.2). ``null`` when the shell has no relay, or
+   * when this window is showing a cloud page. The page then uses its own origin.
    */
   wsEndpoint(): WsRelayEndpoint | null {
     if (wsEndpointCache === undefined) {
@@ -111,6 +114,9 @@ const bridge = {
   },
   checkForUpdates(): Promise<UpdateCheckResult> {
     return ipcRenderer.invoke(IPC_CHANNELS.checkForUpdates);
+  },
+  onOpenConnection(callback: () => void): () => void {
+    return subscribe(IPC_CHANNELS.connectionOpenMenu, callback);
   },
   installUpdate(): Promise<void> {
     return ipcRenderer.invoke(IPC_CHANNELS.installUpdate);
@@ -128,6 +134,43 @@ const bridge = {
     },
     revoke(accessToken: string): Promise<boolean> {
       return ipcRenderer.invoke(IPC_CHANNELS.sessionRevoke, accessToken);
+    },
+    /** One-shot remote login result. Synchronous so the page can store it before React. */
+    takeRemote(): RemoteHandoff | null {
+      return (ipcRenderer.sendSync(IPC_CHANNELS.sessionTakeRemote) as RemoteHandoff | null) ?? null;
+    },
+    loginRemote(input: {
+      captchaToken?: string;
+      mfaCode?: string;
+      method?: "totp" | "recovery";
+    }): Promise<ConnectionWriteResult & { access_token?: string; expires_in?: number }> {
+      return ipcRenderer.invoke(IPC_CHANNELS.connectionLoginRemote, input);
+    },
+  },
+  connection: {
+    get(): Promise<ConnectionView> {
+      return ipcRenderer.invoke(IPC_CHANNELS.connectionGet);
+    },
+    set(input: unknown): Promise<ConnectionWriteResult> {
+      return ipcRenderer.invoke(IPC_CHANNELS.connectionSet, input);
+    },
+    clear(): Promise<ConnectionWriteResult> {
+      return ipcRenderer.invoke(IPC_CHANNELS.connectionClear);
+    },
+    connect(): Promise<ConnectionWriteResult> {
+      return ipcRenderer.invoke(IPC_CHANNELS.connectionConnect);
+    },
+    openForm(): Promise<void> {
+      return ipcRenderer.invoke(IPC_CHANNELS.connectionOpenForm);
+    },
+    useLocal(): Promise<ConnectionWriteResult> {
+      return ipcRenderer.invoke(IPC_CHANNELS.connectionUseLocal);
+    },
+    relaunch(): Promise<void> {
+      return ipcRenderer.invoke(IPC_CHANNELS.connectionRelaunch);
+    },
+    consumeReset(): boolean {
+      return ipcRenderer.sendSync(IPC_CHANNELS.connectionConsumeReset) === true;
     },
   },
 } as const;

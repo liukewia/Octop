@@ -31,6 +31,11 @@ export interface EarlyWindowOptions {
   theme: WindowChromeTheme;
   /** ``preload/early.js`` — the one-method bridge these pages are allowed. */
   preload?: string;
+  /**
+   * Show the splash once it has painted. A login-item launch that should stay
+   * in the Dock or tray passes false. A later failure still shows the window.
+   */
+  showWhenReady?: boolean;
 }
 
 export interface EarlyWindow {
@@ -70,7 +75,7 @@ export function createEarlyWindow(options: EarlyWindowOptions): EarlyWindow {
   concealWindowsMenuBar(win);
   win.once("ready-to-show", () => {
     concealWindowsMenuBar(win);
-    win.show();
+    if (options.showWhenReady !== false) win.show();
   });
   // The splash names the build it is starting; the failure page gets the same
   // value in its payload so the two can never disagree. `theme` is the resolved
@@ -90,6 +95,13 @@ export function createEarlyWindow(options: EarlyWindowOptions): EarlyWindow {
       // Dismissing the failure page ends the launch: on macOS the app would
       // otherwise idle in the Dock with no window and nothing left to show.
       win.once("closed", () => app.quit());
+      // ready-to-show fires only once, and the splash already used it. A hidden
+      // login launch still has to surface this page.
+      if (!win.isVisible()) {
+        win.webContents.once("did-finish-load", () => {
+          if (!win.isDestroyed()) win.show();
+        });
+      }
       void win.loadFile(options.errorFile, {
         query: { [SHELL_ERROR_PARAM]: payload, theme: mode },
       });

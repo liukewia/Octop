@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from fastapi import Depends, Header, Query, Request
 
+from octop.api.common.session_cookie import SESSION_COOKIE
 from octop.infra.auth.tokens import (
     PURPOSE_ACCESS,
     token_mfa_version,
@@ -105,11 +106,16 @@ def extract_raw_token(
     *,
     authorization: str | None = None,
     access_token: str | None = None,
+    cookie: str | None = None,
 ) -> str | None:
     if authorization and authorization.lower().startswith("bearer "):
-        return authorization[7:].strip()
-    if access_token:
-        return access_token
+        token = authorization[7:].strip()
+        if token:
+            return token
+    if access_token and access_token.strip():
+        return access_token.strip()
+    if cookie and cookie.strip():
+        return cookie.strip()
     return None
 
 
@@ -204,6 +210,7 @@ def authenticate_request(request: Request, server: OctopServer) -> User:
     raw = extract_raw_token(
         authorization=request.headers.get("authorization"),
         access_token=request.query_params.get("access_token"),
+        cookie=request.cookies.get(SESSION_COOKIE),
     )
     if not raw:
         raise OctopError(ErrorCode.MISSING_CREDENTIALS, "missing credentials")
@@ -219,7 +226,11 @@ async def current_user(
     cached = getattr(request.state, "octop_user", None)
     if cached is not None:
         return cast("User", cached)
-    raw = extract_raw_token(authorization=authorization, access_token=access_token)
+    raw = extract_raw_token(
+        authorization=authorization,
+        access_token=access_token,
+        cookie=request.cookies.get(SESSION_COOKIE),
+    )
     if not raw:
         raise OctopError(ErrorCode.MISSING_CREDENTIALS, "missing credentials")
     return resolve_user_from_token(server, raw)

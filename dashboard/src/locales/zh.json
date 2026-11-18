@@ -4353,6 +4353,20 @@
       "sourceConfiguredTitle": "当前搜索源：{{name}}",
       "sourceConfiguredDesc": "已配置第三方搜索服务，内置搜索默认不再加载，避免多个搜索工具同时暴露给模型。"
     },
+    "connection": {
+      "title": "云端实例",
+      "description": "填写地址、用户名和密码后，桌面端连接这台 Octop，不再启动本机服务。留空则使用本机。本机数据与云端数据不会合并。",
+      "host": "服务器地址",
+      "username": "用户名",
+      "password": "密码",
+      "remember": "记住密码",
+      "save": "保存并重新连接",
+      "useLocal": "改用本机",
+      "confirmTitle": "重新连接到云端？",
+      "localTitle": "改用本机服务？",
+      "confirmBody": "本机数据与云端数据不会合并。应用会重新启动。",
+      "failed": "无法保存连接"
+    },
     "update": {
       "title": "版本与更新",
       "description": "检查最新版本，一键升级 Octop；右侧可按安装方式查看完整升级说明。",
@@ -4821,6 +4835,12 @@
     "myAccount": "我的账户",
     "settings": "个人设置",
     "appearance": "外观",
+    "desktopLaunchAtLogin": "开机自启",
+    "desktopLaunchWithoutWindow": "开机后不打开窗口",
+    "desktopCloseWindow": "关闭窗口时",
+    "desktopCloseTray": "留在托盘",
+    "desktopCloseDock": "留在程序坞",
+    "desktopCloseQuit": "退出",
     "palette": "配色",
     "paletteHint": "选择界面品牌配色，与浅色/深色模式独立。",
     "language": "语言",

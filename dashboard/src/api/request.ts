@@ -1,3 +1,4 @@
+import { getDesktopBridge } from "../utils/desktopBridge";
 import { getApiUrl } from "./config";
 import {
   isLocalDesktopUser,
@@ -410,6 +411,16 @@ async function retryWithDesktopSession(
   const code = await errorCodeOf(response);
   if (code && !SESSION_UNAUTHORIZED_CODES.has(code)) return null;
   const current = getAuthToken();
+  const remote = await getDesktopBridge()?.connection?.get();
+  if (remote?.mode === "remote") {
+    const issued = await renewDesktopSession();
+    if (!issued?.access_token) return null;
+    setAuthToken(issued.access_token, !isSessionOnlyAuth());
+    return fetch(url, {
+      ...options,
+      headers: buildHeaders(path, options.headers),
+    });
+  }
   // A password account's expired token must land on the login page. Only the
   // desktop local user is renewed in place.
   if (current && !isLocalDesktopUser(current)) return null;
