@@ -2,7 +2,8 @@
  * Shell update coordinator (§6.1). This module only *selects* a release from the
  * manifest; the download lives in `download.ts` and the install hand-off in
  * `installer.ts`. Neither is reachable from the renderer — the preload bridge
- * exposes exactly one install call, `installUpdate()`, which takes no arguments.
+ * exposes `installUpdate()`, which downloads the release the shell re-selects
+ * and then opens it. The call takes no package URL.
  */
 
 import { compareVersions, isNewer, parseVersion } from "../supervisor/version";

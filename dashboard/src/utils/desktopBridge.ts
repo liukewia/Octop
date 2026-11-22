@@ -20,6 +20,18 @@ export interface DesktopUpdateCheckResult {
   error: string | null;
 }
 
+/** Mirrors the shell's update activity. ``percent`` is null when the size is unknown. */
+export type DesktopUpdateActivity =
+  | { phase: "idle" }
+  | {
+      phase: "downloading";
+      percent: number | null;
+      received: number;
+      total: number;
+    }
+  | { phase: "ready" }
+  | { phase: "installing" };
+
 export interface DesktopPlatformInfo {
   platform: "darwin" | "win32" | "linux";
   arch: string;
@@ -177,8 +189,13 @@ export interface OctopDesktopBridge {
   checkForUpdates(): Promise<DesktopUpdateCheckResult>;
   /** macOS File menu asked the page to open the cloud-instance dialog. */
   onOpenConnection?(callback: () => void): () => void;
-  /** Start the shell install. Takes no arguments; the page confirms first. */
+  /** Start the shell download. Takes no arguments; the page confirms first. */
   installUpdate(): Promise<void>;
+  /** Latest download / ready / install phase, including one that started before this page mounted. */
+  updateActivity?(): Promise<DesktopUpdateActivity>;
+  onUpdateActivity?(callback: (activity: DesktopUpdateActivity) => void): () => void;
+  /** Open the installer the shell already downloaded. Takes no arguments. */
+  openInstaller?(): Promise<void>;
 }
 
 declare global {

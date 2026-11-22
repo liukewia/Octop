@@ -25,6 +25,7 @@ import {
   type ConnectionWriteResult,
   type IssuedSession,
   type PlatformInfo,
+  type UpdateActivity,
   type UpdateCheckResult,
 } from "../shared/ipc-contract";
 import { changeShellLanguage, shellT } from "../shared/shell-i18n";
@@ -64,7 +65,11 @@ import {
   type SelectedRelease,
 } from "./update/update-coordinator";
 import { downloadToFile } from "./update/download";
-import { installUpdate, type InstallOutcome, type InstallerKind } from "./update/installer";
+import {
+  fetchUpdatePackage,
+  type InstallerKind,
+  type InstallOutcome,
+} from "./update/installer";
 import {
   dashboardDevOrigin,
   readDashboardDev,
@@ -370,6 +375,23 @@ function updateDownloadDir(): string {
   return join(app.getPath("temp"), "octop-update");
 }
 
+let updateActivity: UpdateActivity = { phase: "idle" };
+let preparedUpdate: { kind: InstallerKind; path: string } | null = null;
+
+function publishUpdate(next: UpdateActivity): void {
+  updateActivity = next;
+  for (const open of BrowserWindow.getAllWindows()) {
+    if (!open.isDestroyed()) open.webContents.send(IPC_CHANNELS.updateActivityChanged, next);
+  }
+}
+
+/** A download that finishes behind a hidden window asks for the user to come back. */
+function attentionForReady(win: BrowserWindow | null): void {
+  if (!win || win.isDestroyed() || win.isVisible()) return;
+  if (process.platform === "darwin") app.dock?.bounce("informational");
+  else win.flashFrame(true);
+}
+
 async function handOffToInstaller(kind: InstallerKind, path: string): Promise<void> {
   if (kind === "appimage") await fs.chmod(path, 0o755);
   if (process.platform === "win32" && (kind === "exe" || kind === "msi")) {
@@ -382,34 +404,33 @@ async function handOffToInstaller(kind: InstallerKind, path: string): Promise<vo
   if (failure) throw new Error(failure);
 }
 
-/** Stop Python cleanly and restart it when the installer never took over. */
-async function restartBackend(win: BrowserWindow | null): Promise<void> {
-  apiAdmissionClosed = false;
-  if (connection?.backend()) {
-    win?.webContents.reload();
-    return;
-  }
-  const ready = await startBackend();
-  if (ready === "ready") win?.webContents.reload();
-}
-
-async function runShellUpdate(
+async function prepareShellUpdate(
   win: BrowserWindow | null,
   selected: SelectedRelease,
 ): Promise<InstallOutcome> {
-  updateInFlight = true;
+  preparedUpdate = null;
+  publishUpdate({ phase: "downloading", percent: 0, received: 0, total: 0 });
   try {
     const dir = updateDownloadDir();
     // Start from an empty staging dir so an aborted earlier attempt cannot be
     // mistaken for (or re-used as) this download.
     await fs.rm(dir, { recursive: true, force: true });
     await fs.mkdir(dir, { recursive: true });
-    return await installUpdate(selected, {
+    let lastEmit = 0;
+    let lastPercent = -1;
+    const outcome = await fetchUpdatePackage(selected, {
       download: async (plan) => {
         const dest = join(dir, plan.filename);
         await downloadToFile(plan.url, dest, net.fetch, {
           onProgress: (received, total) => {
-            if (total > 0) win?.setProgressBar(received / total);
+            const percent = total > 0 ? Math.min(100, Math.round((received / total) * 100)) : null;
+            const now = Date.now();
+            const done = total > 0 && received >= total;
+            if (!done && percent === lastPercent && now - lastEmit < 200) return;
+            lastPercent = percent ?? -1;
+            lastEmit = now;
+            if (total > 0 && win && !win.isDestroyed()) win.setProgressBar(received / total);
+            publishUpdate({ phase: "downloading", percent, received, total });
           },
         });
         return dest;
@@ -417,21 +438,18 @@ async function runShellUpdate(
       // §6.1 assets carry no digest; the URL is already pinned to https on
       // download.octop.cloud by isValidAssetUrl() before it reaches this point.
       verify: async () => true,
-      stopSidecar: async () => {
-        // §6.3 step 1 — refuse new API admissions, then ask Python to exit.
-        apiAdmissionClosed = true;
-        if (!supervisor) return { clean: true, exitCode: null };
-        return supervisor.stop();
-      },
-      handOff: handOffToInstaller,
-      onHandOffFailure: async () => {
-        await restartBackend(win);
-      },
     });
+    return outcome;
   } finally {
-    win?.setProgressBar(-1);
-    updateInFlight = false;
+    if (win && !win.isDestroyed()) win.setProgressBar(-1);
   }
+}
+
+/** Open the already downloaded package again. A dmg stays on screen for the user to drag. */
+async function reopenDownloadedInstaller(): Promise<void> {
+  const current = preparedUpdate;
+  if (!current) return;
+  await handOffToInstaller(current.kind, current.path);
 }
 
 function registerIpcHandlers(): void {
@@ -518,31 +536,68 @@ function registerIpcHandlers(): void {
     }
   });
 
+  ipcMain.handle(IPC_CHANNELS.updateActivity, (): UpdateActivity => updateActivity);
+
   ipcMain.handle(IPC_CHANNELS.installUpdate, async (event) => {
     // The page already confirmed. Ignore every argument and re-select the
     // release here, so the renderer cannot name a package URL (§6.2).
-    if (updateInFlight) return;
+    if (updateInFlight || updateActivity.phase === "installing") return;
+    updateInFlight = true;
     const win = BrowserWindow.fromWebContents(event.sender) ?? BrowserWindow.getAllWindows()[0] ?? null;
 
-    let selected: SelectedRelease | null;
     try {
-      selected = await resolveSelectedRelease();
-    } catch (err) {
-      await showShellError(win, shellT("connection.updateCheckFailed"), errorMessageOf(err));
-      return;
-    }
-    if (!selected) {
-      await showShellMessage(win, shellT("connection.upToDateTitle"), shellT("connection.upToDate", { version: appVersion }));
-      return;
-    }
+      let selected: SelectedRelease | null;
+      try {
+        selected = await resolveSelectedRelease();
+      } catch (err) {
+        await showShellError(win, shellT("connection.updateCheckFailed"), errorMessageOf(err));
+        return;
+      }
+      if (!selected) {
+        preparedUpdate = null;
+        publishUpdate({ phase: "idle" });
+        await showShellMessage(win, shellT("connection.upToDateTitle"), shellT("connection.upToDate", { version: appVersion }));
+        return;
+      }
 
-    const outcome = await runShellUpdate(win, selected);
-    if (!outcome.ok) {
-      await showShellError(win, shellT("connection.updateFailed"), outcome.message);
-      return;
+      const outcome = await prepareShellUpdate(win, selected);
+      if (!outcome.ok) {
+        preparedUpdate = null;
+        publishUpdate({ phase: "idle" });
+        await showShellError(win, shellT("connection.updateFailed"), outcome.message);
+        return;
+      }
+
+      preparedUpdate = { kind: outcome.plan.kind, path: outcome.path };
+      publishUpdate({ phase: "installing" });
+      try {
+        await handOffToInstaller(outcome.plan.kind, outcome.path);
+      } catch (err) {
+        preparedUpdate = null;
+        publishUpdate({ phase: "idle" });
+        await showShellError(win, shellT("connection.updateFailed"), errorMessageOf(err));
+        return;
+      }
+      // An unsigned dmg cannot replace the running app. Leave this process up
+      // and let the user finish in the Finder window we just opened.
+      if (outcome.plan.kind === "dmg") {
+        publishUpdate({ phase: "ready" });
+        attentionForReady(win);
+        return;
+      }
+      app.quit();
+    } finally {
+      updateInFlight = false;
     }
-    // §6.3 step 3: the installer owns the rest — hand it our exit.
-    app.quit();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.openInstaller, async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender) ?? BrowserWindow.getAllWindows()[0] ?? null;
+    try {
+      await reopenDownloadedInstaller();
+    } catch (err) {
+      await showShellError(win, shellT("connection.updateFailed"), errorMessageOf(err));
+    }
   });
 
   ipcMain.handle(IPC_CHANNELS.sessionRegister, (_event, accessToken: unknown): Promise<boolean> => {

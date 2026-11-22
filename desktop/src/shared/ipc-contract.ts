@@ -35,6 +35,17 @@ export interface UpdateCheckResult {
   error: string | null;
 }
 
+/**
+ * Shell-owned update progress. ``installing`` means the downloaded package is
+ * being opened. ``ready`` means the system installer window is up and this
+ * process is still running, which is the unsigned macOS dmg path.
+ */
+export type UpdateActivity =
+  | { phase: "idle" }
+  | { phase: "downloading"; percent: number | null; received: number; total: number }
+  | { phase: "ready" }
+  | { phase: "installing" };
+
 /** A JWT minted by the shell from the stored device credential. */
 export interface IssuedSession {
   access_token: string;
@@ -71,8 +82,13 @@ export const IPC_CHANNELS = {
   clientSettingsSet: "octop:client-settings:set",
   wsEndpoint: "octop:ws-endpoint",
   checkForUpdates: "octop:check-for-updates",
-  /** Page already confirmed. No arguments: the shell re-selects the release. */
+  /** Page already confirmed. No arguments: the shell re-selects the release and downloads it. */
   installUpdate: "octop:install-update",
+  /** Current download / ready / install phase. The page also receives pushes. */
+  updateActivity: "octop:update-activity",
+  updateActivityChanged: "octop:update-activity-changed",
+  /** Open the package already downloaded. No arguments, no new download. */
+  openInstaller: "octop:open-installer",
   windowsMenuModel: "octop:windows-menu:model",
   windowsMenuInvoke: "octop:windows-menu:invoke",
   /** Linux square caption buttons. No-op on the other platforms. */

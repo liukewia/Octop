@@ -1,12 +1,20 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import DesktopUpdatePanel from "./DesktopUpdatePanel";
 
 const installUpdate = vi.fn(() => Promise.resolve());
+const openInstaller = vi.fn(() => Promise.resolve());
+let pushActivity: (activity: {
+  phase: "idle" | "downloading" | "ready" | "installing";
+  percent?: number | null;
+  received?: number;
+  total?: number;
+}) => void = () => {};
 
 beforeEach(() => {
   installUpdate.mockClear();
+  openInstaller.mockClear();
   window.octopDesktop = {
     getPlatformInfo: vi.fn(),
     openDirectoryPicker: vi.fn(),
@@ -35,6 +43,12 @@ beforeEach(() => {
       error: null,
     }),
     installUpdate,
+    updateActivity: vi.fn().mockResolvedValue({ phase: "idle" }),
+    onUpdateActivity: (callback) => {
+      pushActivity = callback;
+      return () => {};
+    },
+    openInstaller,
   };
 });
 
@@ -90,5 +104,53 @@ describe("<DesktopUpdatePanel />", () => {
     );
     expect(installUpdate).toHaveBeenCalledOnce();
     expect(installUpdate).toHaveBeenCalledWith();
+    expect(
+      screen.getByRole("progressbar", {
+        name: "advancedSettings.update.shellDownloading",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows download progress, then tells the user the system installer is open", async () => {
+    const user = userEvent.setup();
+    render(<DesktopUpdatePanel />);
+    await user.click(
+      await screen.findByRole("button", {
+        name: "advancedSettings.update.upgradeButton",
+      }),
+    );
+    await user.click(
+      within(await screen.findByRole("dialog")).getByRole("button", {
+        name: "advancedSettings.update.upgradeButton",
+      }),
+    );
+
+    act(() => {
+      pushActivity({
+        phase: "downloading",
+        percent: 40,
+        received: 40,
+        total: 100,
+      });
+    });
+    expect(await screen.findByRole("progressbar")).toHaveAttribute(
+      "aria-valuenow",
+      "40",
+    );
+    expect(openInstaller).not.toHaveBeenCalled();
+
+    act(() => {
+      pushActivity({ phase: "ready" });
+    });
+    expect(
+      await screen.findByText("advancedSettings.update.shellOpened"),
+    ).toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", {
+        name: "advancedSettings.update.shellOpenAgain",
+      }),
+    );
+    expect(openInstaller).toHaveBeenCalledOnce();
+    expect(openInstaller).toHaveBeenCalledWith();
   });
 });

@@ -5,9 +5,11 @@
  * selected itself, so a hostile renderer cannot redirect the download.
  *
  * Order is fixed and must not be reordered:
- *   download → verify → Python clean exit (code 0) → hand off to the OS
- *   installer. A dirty sidecar exit cancels the install instead of replacing
- *   files under a live Python process.
+ *   download → verify → stage → Python clean exit (code 0) → hand off.
+ * A dirty sidecar exit cancels the install instead of replacing files under a
+ * live Python process. The desktop shell does not use that full sequence for a
+ * dmg: it downloads, then opens the disk image and leaves this process running
+ * so the user can finish in the system window.
  */
 
 import type { SidecarExit } from "../supervisor/sidecar";
@@ -81,38 +83,55 @@ export function planInstall(selected: SelectedRelease): InstallPlan {
 /** Outcome of asking the sidecar to shut down (§3.4). */
 export type { SidecarExit };
 
-export interface InstallHooks {
+export interface FetchHooks {
   /** Download the plan's URL, returning the local path of the finished file. */
   download(plan: InstallPlan): Promise<string>;
   /** Integrity check on the downloaded file; ``false`` aborts the install. */
   verify(path: string): Promise<boolean>;
+  /**
+   * Copy the package into a temp directory before Python exits.
+   * A failure here leaves the running backend untouched.
+   */
+  stage?(kind: InstallerKind, path: string): Promise<void>;
+}
+
+export interface CommitHooks {
   /** Ask Python to exit; must resolve within the shell's grace window. */
   stopSidecar(): Promise<SidecarExit>;
-  /** Open the OS installer / mounted image for the given file. */
+  /** Replace the app, or open the OS installer for the given file. */
   handOff(kind: InstallerKind, path: string): Promise<void>;
   /** Install opened but failed: bring the shell's own backend back up. */
   onHandOffFailure?(): Promise<void>;
 }
+
+export interface InstallHooks extends FetchHooks, CommitHooks {}
 
 export type InstallFailureReason =
   | "unsupported"
   | "untrusted-url"
   | "download"
   | "verify"
+  | "stage"
   | "unclean-exit"
   | "handoff";
 
 export type InstallOutcome =
-  | { ok: true; path: string }
+  | { ok: true; path: string; plan: InstallPlan }
   | { ok: false; reason: InstallFailureReason; message: string };
+
+export type PreparedInstall = { ok: true; path: string; plan: InstallPlan };
 
 function messageOf(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-export async function installUpdate(
+/**
+ * Download and stage one release. Python is still running when this resolves,
+ * so the page can show "restart to install" before anything is replaced.
+ */
+export async function fetchUpdatePackage(
   selected: SelectedRelease,
-  hooks: InstallHooks,
+  hooks: FetchHooks,
 ): Promise<InstallOutcome> {
   const plan = planInstall(selected);
   if (!isSupportedKind(plan.kind)) {
@@ -143,6 +162,20 @@ export async function installUpdate(
     return { ok: false, reason: "verify", message: messageOf(err) };
   }
 
+  try {
+    await hooks.stage?.(plan.kind, path);
+  } catch (err) {
+    return { ok: false, reason: "stage", message: messageOf(err) };
+  }
+
+  return { ok: true, path, plan };
+}
+
+/** Stop Python, then hand the prepared package to the in-place swap or the OS installer. */
+export async function commitUpdate(
+  prepared: PreparedInstall,
+  hooks: CommitHooks,
+): Promise<InstallOutcome> {
   const exit = await hooks.stopSidecar();
   if (!exit.clean) {
     return {
@@ -153,12 +186,21 @@ export async function installUpdate(
   }
 
   try {
-    await hooks.handOff(plan.kind, path);
+    await hooks.handOff(prepared.plan.kind, prepared.path);
   } catch (err) {
     // Files were never touched, so the shell can keep running: restart Python.
     await hooks.onHandOffFailure?.();
     return { ok: false, reason: "handoff", message: messageOf(err) };
   }
 
-  return { ok: true, path };
+  return prepared;
+}
+
+export async function installUpdate(
+  selected: SelectedRelease,
+  hooks: InstallHooks,
+): Promise<InstallOutcome> {
+  const fetched = await fetchUpdatePackage(selected, hooks);
+  if (!fetched.ok) return fetched;
+  return commitUpdate(fetched, hooks);
 }

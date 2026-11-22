@@ -7,6 +7,7 @@ import {
   type IssuedSession,
   type PlatformInfo,
   type RemoteHandoff,
+  type UpdateActivity,
   type UpdateCheckResult,
   type WindowChromeTheme,
   type WsRelayEndpoint,
@@ -120,6 +121,15 @@ const bridge = {
   },
   installUpdate(): Promise<void> {
     return ipcRenderer.invoke(IPC_CHANNELS.installUpdate);
+  },
+  updateActivity(): Promise<UpdateActivity> {
+    return ipcRenderer.invoke(IPC_CHANNELS.updateActivity);
+  },
+  onUpdateActivity(callback: (activity: UpdateActivity) => void): () => void {
+    return subscribe(IPC_CHANNELS.updateActivityChanged, callback);
+  },
+  openInstaller(): Promise<void> {
+    return ipcRenderer.invoke(IPC_CHANNELS.openInstaller);
   },
   /**
    * Device session (§7 accounts). The renderer can ask for a JWT, but the

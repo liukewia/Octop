@@ -200,26 +200,24 @@ the page origin and every hook works in both modes.
 
 ## Update flow (shell-owned)
 
-`installUpdate()` is the only install entry point the renderer has, and it
-takes **no arguments**. The settings page confirms first. The shell then
-re-selects the release, so the page cannot name a package URL. Check and
-install failures stay on the shell's system dialog; download progress stays on
-the taskbar or Dock.
+`installUpdate()` takes **no arguments**. The settings page confirms first.
+The shell re-selects the release, so the page cannot name a package URL.
+Download progress stays on the update page and on the taskbar or Dock. When
+the file is ready the shell opens it. Check and install failures stay on the
+shell's system dialog.
 
 1. `main/update/update-coordinator.ts` selects the release from the manifest
    (stable/beta preference, never a downgrade, `https` + `download.octop.cloud`
    only).
 2. `main/update/download.ts` streams the installer into `$TMPDIR/octop-update`
-   and reports progress to the taskbar/Dock.
-3. API admission closes (the `octop://app/api/*` proxy answers `503`), then
-   `SidecarSupervisor.stop()` waits for Python to exit **by itself with code 0**.
-   A forced kill or non-zero exit cancels the install instead of replacing files
-   under a live backend.
-4. `main/update/installer.ts` hands the file to the OS installer — `dmg`/`pkg`
-   through `shell.openPath`, `exe`/`msi` spawned detached on Windows, AppImage
-   `chmod +x` first — and the shell quits so the installer can replace it.
-5. If the installer never opens, the sidecar is restarted and the window
-   reloads, so a failed hand-off does not leave a dead backend.
+   and reports progress. Python keeps running.
+3. The shell opens the file. An unsigned macOS dmg cannot replace the running
+   app, so Finder's disk-image window is the rest of the install: the user
+   drags Octop to Applications. This process stays up. `openInstaller()` opens
+   that same file again if the window was closed. Windows spawns `exe`/`msi`
+   detached and then quits so the wizard can replace the install directory.
+   `pkg`, AppImage, and `deb` go through `shell.openPath` (AppImage is
+   `chmod +x` first), and the shell quits.
 
 Not covered yet: the §3.4 "running tasks" confirmation before quit (the backend
 has no task-query endpoint) and manifest-level digests — release assets carry no

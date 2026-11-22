@@ -90,8 +90,31 @@ function hooks(overrides: Partial<InstallHooks> = {}) {
 test("installUpdate runs download → verify → clean exit → handoff", async () => {
   const { calls, hooks: h } = hooks();
   const outcome = await installUpdate(selected, h);
-  assert.deepEqual(outcome, { ok: true, path: "/tmp/octop-update/Octop-1.0.3-arm64.dmg" });
+  assert.equal(outcome.ok, true);
+  assert.equal(outcome.ok && outcome.path, "/tmp/octop-update/Octop-1.0.3-arm64.dmg");
+  assert.equal(outcome.ok && outcome.plan.kind, "dmg");
   assert.deepEqual(calls, ["download", "verify", "stop", "handoff"]);
+});
+
+test("stage runs after verify and before Python exits", async () => {
+  const { calls, hooks: h } = hooks();
+  h.stage = async () => {
+    calls.push("stage");
+  };
+  const outcome = await installUpdate(selected, h);
+  assert.equal(outcome.ok, true);
+  assert.deepEqual(calls, ["download", "verify", "stage", "stop", "handoff"]);
+});
+
+test("stage failure aborts before Python is touched", async () => {
+  const { calls, hooks: h } = hooks();
+  h.stage = async () => {
+    calls.push("stage");
+    throw new Error("安装包里没有可识别的应用。");
+  };
+  const outcome = await installUpdate(selected, h);
+  assert.equal(outcome.ok === false && outcome.reason, "stage");
+  assert.deepEqual(calls, ["download", "verify", "stage"]);
 });
 
 test("unsupported asset is refused before anything is downloaded", async () => {
