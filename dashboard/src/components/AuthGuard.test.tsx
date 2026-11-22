@@ -130,28 +130,4 @@ describe("AuthGuard offline boot", () => {
     await user.click(retry);
     expect(await screen.findByText("protected-shell")).toBeInTheDocument();
   });
-
-  it("treats a cookie session as signed in when no token is stored", async () => {
-    vi.mocked(getAuthToken).mockReturnValue(null);
-    vi.mocked(authApi.getAuthStatus).mockResolvedValue({
-      setup_required: false,
-    } as never);
-    vi.mocked(authApi.me).mockResolvedValue({
-      id: 1,
-      username: "ada",
-      role: "user",
-      locale: "zh",
-    } as never);
-
-    render(
-      <MemoryRouter>
-        <AuthGuard>
-          <div>protected-shell</div>
-        </AuthGuard>
-      </MemoryRouter>,
-    );
-
-    expect(await screen.findByText("protected-shell")).toBeInTheDocument();
-    expect(authApi.me).toHaveBeenCalled();
-  });
 });

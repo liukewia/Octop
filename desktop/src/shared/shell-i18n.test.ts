@@ -13,16 +13,16 @@ test("shell language follows the OS tag the same way as the tray", () => {
 
 test("chinese is the default copy", () => {
   changeShellLanguage("zh-CN");
-  assert.equal(shellT("splash.remote"), "正在加载云端 Octop…");
-  assert.equal(shellT("connect.title"), "连接到云端 Octop");
-  assert.equal(shellT("connection.versionSkew", { shellVersion: "1.2.0", remoteVersion: "2.0.0" }), "本机 1.2.0，云端 2.0.0");
+  assert.equal(shellT("splash.preparing"), "正在准备…");
+  assert.equal(shellT("error.title"), "Octop 无法启动");
+  assert.equal(shellT("shell.upToDate", { version: "1.2.0" }), "当前版本 1.2.0。");
 });
 
 test("english copy is selected from a non-chinese tag", () => {
   changeShellLanguage("en-US");
-  assert.equal(shellT("splash.local"), "Loading the local service…");
+  assert.equal(shellT("splash.preparing"), "Getting ready…");
   assert.equal(shellT("error.title"), "Octop could not start");
-  assert.equal(shellT("connection.needPassword"), "Enter a password");
+  assert.equal(shellT("shell.ok"), "OK");
   changeShellLanguage("zh-CN");
-  assert.equal(shellT("connection.needPassword"), "请填写密码");
+  assert.equal(shellT("shell.ok"), "好");
 });

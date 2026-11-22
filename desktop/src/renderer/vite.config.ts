@@ -43,7 +43,6 @@ export default defineConfig({
       input: {
         splash: resolve(root, "splash.html"),
         error: resolve(root, "error.html"),
-        connect: resolve(root, "connect.html"),
       },
     },
   },

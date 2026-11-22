@@ -136,8 +136,6 @@ Windows 的 `pywin32_system32` 下的 `pywintypes*.dll` 在打 zip 时复制到 
 
 每次桌面启动都拉起自己的 Python 进程。壳不读取 `config.json` 的监听地址来寻找后台，也不读取 `desktop-port`，也不接管终端里已经运行的 `octop run`。
 
-可选的云端连接是例外：用户填了 host、用户名和密码时，这次启动不拉起 Python，主进程把 API 与 WebSocket 转到那台服务端。规格见 [`REMOTE_BACKEND.zh.md`](REMOTE_BACKEND.zh.md)。三个字段都空时，下面的本机规则不变。
-
 1. **回环地址**：本次进程固定监听 `127.0.0.1`。通过 `OCTOP_BIND_HOST=127.0.0.1` 覆盖本次进程，不写回 `config.json`。
 2. **随机端口**：壳向操作系统申请一个临时端口（绑定 `127.0.0.1:0` 后立即关闭），再把得到的端口通过 `OCTOP_PORT` 传给子进程。端口只存在于本次进程。
 3. **不写配置**：启动命令是 `launch.py run`，不传 `--host` 或 `--port`。这两个 CLI 参数会写回 `config.json`；环境变量只覆盖本次进程。

@@ -4353,20 +4353,6 @@
       "sourceConfiguredTitle": "Current search source: {{name}}",
       "sourceConfiguredDesc": "A third-party search provider is configured, so the built-in search is no longer loaded by default, avoiding multiple search tools being exposed to the model at once."
     },
-    "connection": {
-      "title": "Cloud instance",
-      "description": "Enter a host, username, and password to use that Octop server instead of starting one on this computer. Leave them empty to stay local. Local data and cloud data are not merged.",
-      "host": "Server address",
-      "username": "Username",
-      "password": "Password",
-      "remember": "Remember password",
-      "save": "Save and reconnect",
-      "useLocal": "Use this computer",
-      "confirmTitle": "Reconnect to the cloud?",
-      "localTitle": "Use the local service?",
-      "confirmBody": "Local data and cloud data are not merged. The app will restart.",
-      "failed": "Could not save the connection"
-    },
     "update": {
       "title": "Version & Updates",
       "description": "Check for the latest release and upgrade in place; use the guide on the right for other install methods.",
@@ -4840,12 +4826,6 @@
     "myAccount": "My Account",
     "settings": "Personal Settings",
     "appearance": "Appearance",
-    "desktopLaunchAtLogin": "Launch at login",
-    "desktopLaunchWithoutWindow": "No window at login",
-    "desktopCloseWindow": "When closing the window",
-    "desktopCloseTray": "Keep in tray",
-    "desktopCloseDock": "Keep in Dock",
-    "desktopCloseQuit": "Quit",
     "palette": "Palette",
     "paletteHint": "Choose a brand palette, independent of light/dark mode.",
     "language": "Language",

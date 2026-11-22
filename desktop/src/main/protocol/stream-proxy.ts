@@ -1,14 +1,10 @@
 /**
- * Reverse-proxy ``octop://app/api/*`` to the current backend (§5.2).
+ * Reverse-proxy the ``octop://app/api/*`` path to the loopback sidecar (§5.2).
  *
- * Local mode targets the sidecar on ``127.0.0.1``. Remote mode targets the
- * saved origin. The renderer never names that target. Hop-by-hop headers are
- * stripped and the stream is forwarded with backpressure, so SSE is not
- * buffered. Redirects are not followed: ``isRedirectStatus`` decides that in
- * the protocol handler.
+ * The renderer never learns the real port or any credential. The main process
+ * strips hop-by-hop / connection-level headers and forwards the stream with
+ * backpressure, so SSE and streaming responses are not buffered in memory.
  */
-
-import type { BackendTarget } from "../connection/target";
 
 const HOP_BY_HOP = new Set([
   "connection",
@@ -35,15 +31,10 @@ export function sanitizeForwardHeaders(headers: Headers): Record<string, string>
   return out;
 }
 
-/** Map ``octop://app/api/...`` onto the current backend, preserving the query. */
-export function toBackendUrl(target: BackendTarget, pathname: string, search: string): string {
+/** Map ``octop://app/api/...`` to ``http://127.0.0.1:<port>/api/...``. */
+export function toBackendUrl(port: number, pathname: string, search: string): string {
   const rest = pathname.replace(/^\/api/, "");
-  return `${target.origin}/api${rest}${search}`;
-}
-
-/** Upstream ``Host`` value. Fetch may ignore a manual Host; the relay sets it itself. */
-export function backendHostHeader(target: BackendTarget): string {
-  return target.hostHeader;
+  return `http://127.0.0.1:${port}/api${rest}${search}`;
 }
 
 /** Only the app's own ``/api/*`` route is proxied — everything else is static. */

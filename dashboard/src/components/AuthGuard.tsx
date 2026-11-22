@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { clearAuthToken } from "../api/request";
+import { clearAuthToken, getAuthToken } from "../api/request";
 import { authApi, type OctopUser } from "../api/modules/auth";
 import { applyUserLocale } from "../utils/locale";
 import { isNetworkFetchError } from "../utils/networkError";
@@ -67,8 +67,21 @@ export default function AuthGuard({ children }: AuthGuardProps) {
           return;
         }
 
-        // A stored token is the Bearer session. A cookie-only session has no
-        // token the page can see, so /auth/me is the check for both.
+        // Setup done. Need a token.
+        const token = getAuthToken();
+        if (!token) {
+          if (!cancelled) {
+            setAuthed(false);
+            // Stay on the spinner until navigation away completes — do not
+            // flip ``checking`` off or children would mount and 401→/login.
+            navigateRef.current("/login", { replace: true });
+          }
+          return;
+        }
+
+        // Validate the token by hitting /auth/me. On 401 the request.ts
+        // interceptor already kicks the user back to /login, so we just
+        // need to swallow the throw here.
         try {
           const me = await authApi.me();
           await applyUserLocale(me.locale);

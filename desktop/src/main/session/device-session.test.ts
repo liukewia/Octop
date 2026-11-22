@@ -172,25 +172,6 @@ test("renew returns null on a rejected credential or a malformed body", async ()
   await malformed.cleanup();
 });
 
-test("renew returns null in remote mode without calling the sidecar", async () => {
-  const remote = await makeFixture({
-    seed: "stored-secret",
-    respond: () => jsonResponse(200, { access_token: "should-not-be-used", expires_in: 1 }),
-  });
-  const inactive = new DeviceSessionClient({
-    store: remote.store,
-    baseUrl: () => "http://127.0.0.1:51234",
-    label: "darwin-arm64",
-    fetchImpl: (async () => {
-      throw new Error("device renewal must not run while a remote backend is selected");
-    }) as typeof fetch,
-    active: () => false,
-  });
-  assert.equal(await inactive.renew(), null);
-  assert.equal(remote.calls.length, 0);
-  await remote.cleanup();
-});
-
 test("renew and register degrade quietly while the sidecar is down", async () => {
   const noBase = await makeFixture({
     baseUrl: null,

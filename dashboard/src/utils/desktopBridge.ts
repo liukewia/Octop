@@ -75,53 +75,6 @@ export interface DesktopIssuedSession {
   expires_in: number;
 }
 
-export interface DesktopConnectionView {
-  mode: "local" | "remote";
-  origin: string;
-  username: string;
-  hasPassword: boolean;
-  versionWarning: string | null;
-}
-
-export interface DesktopRemoteMfaChallenge {
-  mfa_required: true;
-  mfa_token: string;
-  methods: string[];
-  user_hint: string;
-  locale: string;
-}
-
-export type DesktopRemoteHandoff =
-  | { kind: "token"; access_token: string; expires_in: number }
-  | { kind: "mfa"; username: string; challenge: DesktopRemoteMfaChallenge }
-  | { kind: "captcha"; username: string };
-
-export interface DesktopConnectionResult {
-  ok: boolean;
-  error?: string;
-  detail?: string;
-  access_token?: string;
-  expires_in?: number;
-  mfa?: DesktopRemoteMfaChallenge;
-}
-
-export interface DesktopConnectionBridge {
-  get(): Promise<DesktopConnectionView>;
-  set(input: {
-    mode: "local" | "remote";
-    origin?: string;
-    username?: string;
-    password?: string;
-    rememberPassword?: boolean;
-  }): Promise<DesktopConnectionResult>;
-  clear(): Promise<DesktopConnectionResult>;
-  connect(): Promise<DesktopConnectionResult>;
-  openForm(): Promise<void>;
-  useLocal(): Promise<DesktopConnectionResult>;
-  relaunch(): Promise<void>;
-  consumeReset(): boolean;
-}
-
 export interface DesktopSessionBridge {
   /** Bind the credential to the signed-in user; false when the shell refused. */
   register(accessToken: string): Promise<boolean>;
@@ -129,18 +82,10 @@ export interface DesktopSessionBridge {
   renew(): Promise<DesktopIssuedSession | null>;
   /** Forget this install's credential. */
   revoke(accessToken: string): Promise<boolean>;
-  /** One-shot remote login result, read before React mounts. */
-  takeRemote?(): DesktopRemoteHandoff | null;
-  loginRemote?(input: {
-    captchaToken?: string;
-    mfaCode?: string;
-    method?: "totp" | "recovery";
-  }): Promise<DesktopConnectionResult>;
 }
 
 export interface OctopDesktopBridge {
   session?: DesktopSessionBridge;
-  connection?: DesktopConnectionBridge;
   /**
    * Where to dial WebSockets (§5.2). Absent on an older shell, and null when the
    * relay could not bind — both mean "derive the address from the page origin".
@@ -187,8 +132,6 @@ export interface OctopDesktopBridge {
     set(patch: Partial<DesktopClientSettings>): Promise<DesktopClientSettings>;
   };
   checkForUpdates(): Promise<DesktopUpdateCheckResult>;
-  /** macOS File menu asked the page to open the cloud-instance dialog. */
-  onOpenConnection?(callback: () => void): () => void;
   /** Start the shell download. Takes no arguments; the page confirms first. */
   installUpdate(): Promise<void>;
   /** Latest download / ready / install phase, including one that started before this page mounted. */
@@ -208,13 +151,6 @@ export function isDesktopShell(): boolean {
   return (
     typeof window !== "undefined" && typeof window.octopDesktop !== "undefined"
   );
-}
-
-/** Electron on macOS. The close-window label says Dock there; other shells say tray. */
-export function isMacDesktopShell(
-  userAgent = typeof navigator === "undefined" ? "" : navigator.userAgent,
-): boolean {
-  return isDesktopShell() && /Mac OS X/.test(userAgent);
 }
 
 /**

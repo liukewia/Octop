@@ -1,6 +1,5 @@
 import {
   clearSetupRequired,
-  getAuthToken,
   isSessionOnlyAuth,
   markSetupRequired,
   request,
@@ -176,23 +175,7 @@ const REAUTH_HEADER = "X-Octop-Reauth";
 /** Replace the stored session JWT when a mutating MFA call returns one. */
 export function adoptAccessToken(accessToken: string | undefined | null): void {
   if (!accessToken) return;
-  void persistIssuedToken(accessToken, !isSessionOnlyAuth());
-}
-
-/**
- * Keep a Bearer token only when this server did not accept the session cookie.
- * A cookie login leaves nothing in localStorage for page scripts to read.
- */
-export async function persistIssuedToken(accessToken: string, remember = true): Promise<void> {
-  if (!getAuthToken()) {
-    try {
-      await request<unknown>("/auth/me");
-      return;
-    } catch {
-      // Cookie was not enough. Fall through to the stored token.
-    }
-  }
-  setAuthToken(accessToken, remember);
+  setAuthToken(accessToken, !isSessionOnlyAuth());
 }
 
 function adoptFromMutation<T extends MfaMutationResponse>(body: T): T {

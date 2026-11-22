@@ -48,7 +48,6 @@ import { useIsMobile } from "../hooks/useIsMobile";
 import AppVersionBadge from "./AppVersionBadge";
 import ThemeSwitcher from "./ThemeSwitcher";
 import PaletteSwitcher from "./PaletteSwitcher";
-import DesktopClientMenu from "./DesktopClientMenu";
 import type { OctopUser } from "../api/modules/auth";
 import { useLayoutMode } from "../context/LayoutModeContext";
 import type { LayoutMode } from "../layouts/layoutModeStorage";
@@ -340,8 +339,6 @@ export default function AvatarDropdown({
         </div>
         <ThemeSwitcher compact />
       </div>
-
-      <DesktopClientMenu />
 
       <a
         className={styles.menuItem}
