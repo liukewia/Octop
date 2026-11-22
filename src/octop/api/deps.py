@@ -11,6 +11,7 @@ from fastapi import Depends, Header, Query, Request
 from octop.api.common.session_cookie import SESSION_COOKIE
 from octop.infra.auth.tokens import (
     PURPOSE_ACCESS,
+    token_cloud_session,
     token_mfa_version,
     token_password_version,
     token_purpose,
@@ -52,6 +53,10 @@ _JWT_EXEMPT_PREFIXES = (
 _JWT_EXEMPT_EXACT = (
     "/api/health",
     "/api/auth/login",
+    # Cloud account sign-in: the cloud service is the credential authority.
+    "/api/auth/cloud/status",
+    "/api/auth/cloud/login",
+    "/api/auth/cloud/refresh",
     # Desktop shells renew an expired session here; the device token is the
     # credential and the router enforces shell-flag + loopback + digest match.
     "/api/auth/device/token",
@@ -162,7 +167,41 @@ def resolve_user_from_token(server: OctopServer, token: str) -> User:
     current_password_version = int(row.password_version) if row is not None else 0
     if claim_password_version != current_password_version:
         raise OctopError(ErrorCode.AUTH_FAILED, "invalid token")
+    _require_cloud_session(server, payload=payload, user_id=user.id, row=row)
     return user
+
+
+def _require_cloud_session(
+    server: OctopServer,
+    *,
+    payload: dict[str, Any],
+    user_id: int,
+    row: Any,
+) -> None:
+    """Enforce the local session behind a cloud account token.
+
+    Local accounts have no ``cs`` claim and are unaffected. A cloud projection
+    must present a live session: that is what makes logout, admin revocation,
+    and the offline grace window real rather than decorative.
+    """
+    try:
+        session_id = token_cloud_session(payload)
+    except InvalidToken as exc:
+        raise OctopError(ErrorCode.AUTH_FAILED, "invalid token") from exc
+    is_cloud = str(getattr(row, "source", "local") or "local") == "cloud"
+    if session_id is None:
+        if is_cloud:
+            raise OctopError(
+                ErrorCode.CLOUD_ACCOUNT_SESSION_REVOKED,
+                "cloud session required",
+            )
+        return
+    session = server.services.cloud_session_repo.get(session_id) if server.services else None
+    if session is None or session.user_id != user_id or not session.is_active():
+        raise OctopError(
+            ErrorCode.CLOUD_ACCOUNT_SESSION_REVOKED,
+            "cloud session is no longer valid",
+        )
 
 
 def maybe_sliding_renew_token(server: OctopServer, token: str, user: User) -> str | None:
@@ -184,6 +223,16 @@ def maybe_sliding_renew_token(server: OctopServer, token: str, user: User) -> st
         if row is not None and int(row.mfa_version) != 0:
             return None
     ttl = int(server.services.config.access_token_ttl_seconds)
+    try:
+        cloud_session = token_cloud_session(payload)
+    except InvalidToken:
+        return None
+    if cloud_session is not None:
+        session = server.services.cloud_session_repo.get(cloud_session)
+        if session is None or not session.is_active():
+            return None
+        # A renewed token must not outlive the cloud session's grace window.
+        ttl = min(ttl, max(1, session.grace_expires_at - int(time.time())))
     remaining = int(payload["exp"]) - int(time.time())
     threshold = max(1, int(ttl * _SLIDING_RENEW_REMAINING_FRACTION))
     if remaining >= threshold:
@@ -203,6 +252,7 @@ def maybe_sliding_renew_token(server: OctopServer, token: str, user: User) -> st
         ttl_seconds=ttl,
         mfa_version=mfa_version,
         password_version=password_version,
+        cloud_session=cloud_session,
     )
 
 

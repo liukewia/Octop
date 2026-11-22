@@ -137,6 +137,7 @@ export const USERS_TAB_PERMISSIONS = {
   dingtalk: "sso_dingtalk",
   oidc: "sso_oidc",
   ldap: "sso_ldap",
+  cloud: "users",
 } as const;
 
 export const ADVANCED_TAB_PERMISSIONS = {

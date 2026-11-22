@@ -69,6 +69,12 @@ class UserRow:
     role_name: str | None = None
     avatar_icon: str | None = None
     last_login_at: int | None = None
+    # "local": a password lives here. "cloud": this row projects an account that
+    # the cloud identity service owns; password and role are read-only locally.
+    source: str = "local"
+    cloud_issuer: str | None = None
+    cloud_subject: str | None = None
+    cloud_synced_at: int | None = None
 
     @classmethod
     def from_row(cls, r: DbRow) -> UserRow:
@@ -77,6 +83,8 @@ class UserRow:
         role_name = str(raw_name).strip() if isinstance(raw_name, str) else ""
         raw_icon = r["avatar_icon"] if "avatar_icon" in keys else None
         avatar_icon = str(raw_icon).strip() if isinstance(raw_icon, str) else ""
+        raw_source = r["source"] if "source" in keys else None
+        source = str(raw_source).strip() if isinstance(raw_source, str) else ""
         return cls(
             id=r["id"],
             username=r["username"],
@@ -102,6 +110,18 @@ class UserRow:
             last_login_at=(
                 int(r["last_login_at"]) if "last_login_at" in keys and r["last_login_at"] else None
             ),
+            source=source or "local",
+            cloud_issuer=(
+                str(r["cloud_issuer"]).strip() if r["cloud_issuer"] not in (None, "") else None
+            )
+            if "cloud_issuer" in keys
+            else None,
+            cloud_subject=(
+                str(r["cloud_subject"]).strip() if r["cloud_subject"] not in (None, "") else None
+            )
+            if "cloud_subject" in keys
+            else None,
+            cloud_synced_at=int(r["cloud_synced_at"] or 0) if "cloud_synced_at" in keys else None,
         )
 
 
@@ -122,6 +142,9 @@ class UserRepo:
         sso_subject: str | None = None,
         permissions: builtins.list[str] | None = None,
         role_name: str | None = None,
+        source: str = "local",
+        cloud_issuer: str | None = None,
+        cloud_subject: str | None = None,
     ) -> int:
         perms_json = json.dumps(permissions or [], ensure_ascii=False)
         with self._db.transaction() as conn:
@@ -129,8 +152,8 @@ class UserRepo:
                 conn,
                 "INSERT INTO users(username, password_hash, role, display_name, locale, "
                 "email, sso_provider_id, sso_subject, disabled, created_at, permissions, "
-                "role_name) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)",
+                "role_name, source, cloud_issuer, cloud_subject) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)",
                 (
                     username,
                     password_hash,
@@ -143,7 +166,76 @@ class UserRepo:
                     now_ts(),
                     perms_json,
                     role_name,
+                    source,
+                    cloud_issuer,
+                    cloud_subject,
                 ),
+            )
+
+    def get_by_cloud_identity(self, issuer: str, subject: str) -> UserRow | None:
+        """The local projection of a cloud account, keyed by (issuer, subject)."""
+        if not issuer or not subject:
+            return None
+        with self._db.connect() as conn:
+            r = conn.execute(
+                "SELECT * FROM users WHERE cloud_issuer = ? AND cloud_subject = ?",
+                (issuer, subject),
+            ).fetchone()
+        return UserRow.from_row(r) if r else None
+
+    def update_cloud_profile(
+        self,
+        user_id: int,
+        *,
+        username: str | None = None,
+        role: str | None = None,
+        display_name: str | None = None,
+        email: str | None = None,
+        locale: str | None = None,
+        permissions: builtins.list[str] | None = None,
+        role_name: str | None = None,
+        synced_at: int | None = None,
+    ) -> None:
+        """Refresh a cloud projection from authoritative cloud claims.
+
+        Deliberately bypasses ``UserManager``: these fields are owned upstream, and
+        the manager blocks local edits to them.
+        """
+        fields: builtins.list[str] = []
+        params: builtins.list[object] = []
+        if username is not None:
+            fields.append("username = ?")
+            params.append(username)
+        if role is not None:
+            fields.append("role = ?")
+            params.append(role)
+        if display_name is not None:
+            fields.append("display_name = ?")
+            params.append(display_name)
+        if email is not None:
+            fields.append("email = ?")
+            params.append(email)
+        if locale is not None:
+            fields.append("locale = ?")
+            params.append(locale)
+        if permissions is not None:
+            fields.append("permissions = ?")
+            params.append(json.dumps(permissions, ensure_ascii=False))
+        if role_name is not None:
+            fields.append("role_name = ?")
+            params.append(role_name)
+        fields.append("cloud_synced_at = ?")
+        params.append(synced_at if synced_at is not None else now_ts())
+        params.append(user_id)
+        with self._db.transaction() as conn:
+            conn.execute(f"UPDATE users SET {', '.join(fields)} WHERE id = ?", params)
+
+    def count_by_source(self, source: str) -> int:
+        with self._db.connect() as conn:
+            return int(
+                conn.execute(
+                    "SELECT COUNT(*) FROM users WHERE source = ?", (source,)
+                ).fetchone()[0]
             )
 
     def get(self, user_id: int) -> UserRow | None:

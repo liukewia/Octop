@@ -1,11 +1,13 @@
 import {
   clearSetupRequired,
+  getAuthToken,
   isSessionOnlyAuth,
   markSetupRequired,
   request,
   requestUpload,
   setAuthToken,
 } from "../request";
+import { isCloudSessionToken } from "../../utils/jwtClaims";
 import type {
   AuthenticationCredentialJSON,
   PublicKeyCreationOptionsJSON,
@@ -85,6 +87,11 @@ export interface OctopUser {
    * ``null`` or omitted means local shell.
    */
   default_backend_type?: string | null;
+  /** ``local`` owns its password; ``cloud`` is a projection of a cloud account. */
+  source?: "local" | "cloud";
+  cloud_managed?: boolean;
+  cloud_issuer?: string | null;
+  cloud_synced_at?: number | null;
 }
 
 export interface LoginResponse {
@@ -603,8 +610,17 @@ export const authApi = {
     request<void>(`/users/${userId}/mfa`, { method: "DELETE" }),
 
   /** Server-side logout (best-effort; client clears token regardless). */
-  logout: () =>
-    request<void>("/auth/logout", { method: "POST" }).catch(() => undefined),
+  logout: async () => {
+    const token = getAuthToken();
+    if (token && isCloudSessionToken(token)) {
+      // Revoke the cloud session too, while the local token is still valid.
+      const { cloudAuthApi } = await import("./cloudAuth");
+      await cloudAuthApi.logout().catch(() => undefined);
+    }
+    return request<void>("/auth/logout", { method: "POST" }).catch(
+      () => undefined,
+    );
+  },
 
   /** Get the current authenticated user. */
   me: () => request<OctopUser>("/auth/me"),

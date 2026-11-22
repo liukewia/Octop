@@ -543,7 +543,9 @@ export default function AvatarDropdown({
             {t("account.displayName")}
           </h3>
           <p className={styles.settingsSectionDesc}>
-            {t("account.displayNameHint")}
+            {user?.cloud_managed
+              ? t("account.cloudProfileManaged")
+              : t("account.displayNameHint")}
           </p>
         </div>
         <Form
@@ -567,6 +569,7 @@ export default function AvatarDropdown({
             <Input
               placeholder={t("account.displayNamePlaceholder")}
               maxLength={64}
+              disabled={Boolean(user?.cloud_managed)}
             />
           </Form.Item>
         </Form>
@@ -630,7 +633,7 @@ export default function AvatarDropdown({
         <PaletteSwitcher />
       </section>
 
-      {ssoRows.length > 0 && (
+      {ssoRows.length > 0 && !user?.cloud_managed && (
         <>
           <Divider className={styles.settingsDivider} />
           <section className={styles.settingsSection}>
@@ -693,6 +696,22 @@ export default function AvatarDropdown({
           </section>
         </>
       )}
+
+      {user?.cloud_managed ? (
+        <>
+          <Divider className={styles.settingsDivider} />
+          <section className={styles.settingsSection}>
+            <div className={styles.settingsSectionHead}>
+              <h3 className={styles.settingsSectionTitle}>
+                {t("account.ssoTitle")}
+              </h3>
+              <p className={styles.settingsSectionDesc}>
+                {t("account.cloudSsoManaged")}
+              </p>
+            </div>
+          </section>
+        </>
+      ) : null}
     </div>
   );
 
@@ -750,6 +769,7 @@ export default function AvatarDropdown({
             <Button
               type="primary"
               loading={saving}
+              disabled={Boolean(user?.cloud_managed)}
               onClick={() => profileForm.submit()}
             >
               {t("common.save")}

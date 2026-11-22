@@ -570,7 +570,14 @@
     "WEBAUTHN_LOGIN_DISABLED": "Passkey sign-in on the login page is turned off. An administrator can enable it under App settings → Passkeys.",
     "GIT_NO_CHANGES": "There are no changes to commit.",
     "GIT_COMMIT_MESSAGE_INVALID": "The model did not return a usable commit message; please write one.",
-    "GIT_PUSH_DETACHED": "Cannot push while HEAD is detached."
+    "GIT_PUSH_DETACHED": "Cannot push while HEAD is detached.",
+    "CLOUD_ACCOUNT_NOT_CONFIGURED": "The cloud account service is not configured, or cloud sign-in is turned off.",
+    "CLOUD_ACCOUNT_UNAVAILABLE": "The cloud account service is unreachable right now. Try again shortly.",
+    "CLOUD_ACCOUNT_MFA_REQUIRED": "This cloud account requires a second factor.",
+    "CLOUD_ACCOUNT_DISABLED": "This cloud account has been disabled.",
+    "CLOUD_ACCOUNT_SESSION_REVOKED": "The cloud session is no longer valid. Sign in again.",
+    "CLOUD_MANAGED_ACCOUNT": "This account is managed by the cloud service; password, role, and permissions cannot be edited locally.",
+    "CLOUD_ACCOUNT_BAD_REQUEST": "Invalid cloud account configuration: {message}"
   },
   "desktop": {
     "install_log_deps": "Installing Python dependencies…",

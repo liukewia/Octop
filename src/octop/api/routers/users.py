@@ -161,6 +161,12 @@ def _row_to_dict(
         "display_name": r.display_name,
         "email": r.email,
         "has_password": r.password_hash is not None,
+        # Where this account is governed. ``cloud`` rows are a local projection:
+        # the list stays readable, but every mutation is refused upstream.
+        "source": getattr(r, "source", "local") or "local",
+        "cloud_managed": (getattr(r, "source", "local") or "local") == "cloud",
+        "cloud_issuer": getattr(r, "cloud_issuer", None),
+        "cloud_synced_at": getattr(r, "cloud_synced_at", None),
         "sso_linked": r.sso_provider_id is not None and r.sso_subject is not None,
         "directory": bool(
             directory_provider_id is not None

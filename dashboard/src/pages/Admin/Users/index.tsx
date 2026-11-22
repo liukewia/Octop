@@ -1,7 +1,7 @@
 import { useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Navigate, useSearchParams } from "react-router-dom";
-import { Group, IdCard, Network, Users } from "lucide-react";
+import { Cloud, Group, IdCard, Network, Users } from "lucide-react";
 import PageShell from "../../../layouts/PageShell";
 import TabBar, { type TabBarItem } from "../../../components/TabLabel/TabBar";
 import { TAB_ICON_SIZE } from "../../../components/TabLabel";
@@ -11,6 +11,7 @@ import GroupsPanel from "./GroupsPanel";
 import UsersListPanel from "./UsersListPanel";
 import SsoPanel from "./SsoPanel";
 import LdapPanel from "./LdapPanel";
+import CloudAccountsPanel from "./CloudAccountsPanel";
 import OauthProviderCard from "./OauthProviderCard";
 import { OAUTH_APP_PROVIDERS, type OauthAppKind } from "./oauthProviders";
 import ForbiddenPage from "../../../components/ForbiddenPage";
@@ -22,7 +23,14 @@ import dingtalkIcon from "../../../assets/channels/dingtalk.svg";
 import openidIcon from "../../../assets/providers/openid.svg";
 import styles from "./index.module.less";
 
-type TabKey = "local" | "roles" | "groups" | OauthAppKind | "oidc" | "ldap";
+type TabKey =
+  | "local"
+  | "roles"
+  | "groups"
+  | OauthAppKind
+  | "oidc"
+  | "ldap"
+  | "cloud";
 
 const OAUTH_BRAND_ICONS: Record<OauthAppKind, string> = {
   feishu: feishuIcon,
@@ -69,6 +77,11 @@ const TABS: TabBarItem<TabKey>[] = [
     labelKey: "adminUsers.tabLdap",
     icon: Network,
   },
+  {
+    key: "cloud",
+    labelKey: "adminUsers.tabCloud",
+    icon: Cloud,
+  },
 ];
 
 function parseTab(raw: string | null): TabKey {
@@ -79,7 +92,8 @@ function parseTab(raw: string | null): TabKey {
     raw === "wecom" ||
     raw === "dingtalk" ||
     raw === "oidc" ||
-    raw === "ldap"
+    raw === "ldap" ||
+    raw === "cloud"
   ) {
     return raw;
   }
@@ -152,6 +166,17 @@ function AdminUsersPageBody() {
           description={t("adminSso.ldapDesc")}
         />
         <LdapPanel />
+      </div>
+    );
+  } else if (activeTab === "cloud") {
+    body = (
+      <div className={styles.ssoPanel}>
+        <TabPanelHeader
+          icon={<Cloud size={22} />}
+          title={t("cloudAccounts.title")}
+          description={t("cloudAccounts.description")}
+        />
+        <CloudAccountsPanel />
       </div>
     );
   } else if (

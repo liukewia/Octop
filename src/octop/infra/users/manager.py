@@ -26,7 +26,7 @@ from octop.infra.errors import ErrorCode, OctopError
 from octop.infra.users.email import normalize_email, parse_optional_email
 from octop.infra.users.identity import Role, User
 from octop.infra.users.password import hash_password, validate_password_policy, verify_password
-from octop.infra.users.permissions import validate_permission_keys
+from octop.infra.users.permissions import PERMISSIONS, validate_permission_keys
 from octop.infra.users.preferences import (
     ModelReasoningPreference,
     RemoteBrowserBookmark,
@@ -79,6 +79,21 @@ def _is_unique_violation(exc: BaseException) -> bool:
     if isinstance(exc, sqlite3.IntegrityError):
         return "unique" in str(exc).lower()
     return pg_errors is not None and isinstance(exc, pg_errors.UniqueViolation)
+
+
+def _require_local_account(row: Any, *, action: str) -> None:
+    """Refuse a local mutation that the cloud owns.
+
+    A cloud projection is a cache of an account whose password, role, and
+    permissions live upstream. Letting the local admin edit them would be a
+    silent fork: the next sign-in overwrites the change.
+    """
+    if str(getattr(row, "source", "local") or "local") == "cloud":
+        raise OctopError(
+            ErrorCode.CLOUD_MANAGED_ACCOUNT,
+            f"{action} is managed by the cloud account service",
+            details={"action": action},
+        )
 
 
 class UserManager:
@@ -351,6 +366,144 @@ class UserManager:
                 return user
             return cached_user
 
+    async def resolve_or_create_cloud_user(
+        self,
+        *,
+        issuer: str,
+        subject: str,
+        username: str,
+        display_name: str | None,
+        email: str | None,
+        role: str | None,
+        permissions: builtins.list[str] | None,
+        locale: str | None,
+        allow_admin: bool = True,
+    ) -> User:
+        """Project a cloud account into the local user table.
+
+        Identity is ``(issuer, subject)``, so a rename upstream keeps the same
+        local row. Everything the cloud owns is re-applied on every sign-in; a
+        manual local edit cannot survive, which is why the manager blocks those
+        edits in the first place.
+        """
+        async with self._lock:
+            row = self._services.user_repo.get_by_cloud_identity(issuer, subject)
+            if row is None:
+                from octop.infra.db.repos.user_roles import seeded_user_role_assignment
+
+                assignment = seeded_user_role_assignment(self._services.db)
+                default_role = assignment[0] if assignment else str(Role.USER)
+                default_name = assignment[1] if assignment else None
+                default_perms = list(assignment[2]) if assignment else []
+                wants_admin = (role or "").strip().lower() == str(Role.ADMIN)
+                role_id = str(Role.ADMIN) if wants_admin and allow_admin else default_role
+                role_name = None if role_id == str(Role.ADMIN) else default_name
+                base_perms = [] if role_id == str(Role.ADMIN) else default_perms
+                if permissions is not None and role_id != str(Role.ADMIN):
+                    base_perms = [key for key in permissions if key in PERMISSIONS]
+                email_clean = parse_optional_email(email)
+                if email_clean is not None:
+                    owner = self._services.user_repo.get_by_email(email_clean)
+                    if owner is not None:
+                        email_clean = None
+                allocated = self._allocate_cloud_username(username, issuer, subject)
+                uid = self._services.user_repo.create(
+                    username=allocated,
+                    password_hash=None,
+                    role=role_id,
+                    display_name=display_name,
+                    locale=normalize_locale(locale),
+                    email=email_clean,
+                    permissions=base_perms,
+                    role_name=role_name,
+                    source="cloud",
+                    cloud_issuer=issuer,
+                    cloud_subject=subject,
+                )
+                self._services.user_repo.update_cloud_profile(uid, synced_at=int(time.time()))
+                row = self._services.user_repo.get(uid)
+                self._services.audit_repo.write(
+                    actor=allocated, action="user.cloud_create", target=allocated
+                )
+            if row is None:
+                raise OctopError(ErrorCode.INTERNAL_ERROR, "cloud user provisioning failed")
+            if row.disabled:
+                raise OctopError(ErrorCode.USER_DISABLED, "user is disabled")
+
+            wants_admin = (role or "").strip().lower() == str(Role.ADMIN)
+            if wants_admin and allow_admin:
+                desired_role, desired_name, desired_perms = str(Role.ADMIN), None, []
+            else:
+                from octop.infra.db.repos.user_roles import seeded_user_role_assignment
+
+                assignment = seeded_user_role_assignment(self._services.db)
+                desired_role = assignment[0] if assignment else str(Role.USER)
+                desired_name = assignment[1] if assignment else None
+                desired_perms = list(assignment[2]) if assignment else []
+                if permissions is not None:
+                    desired_perms = [key for key in permissions if key in PERMISSIONS]
+
+            email_clean = parse_optional_email(email)
+            if email_clean is not None:
+                owner = self._services.user_repo.get_by_email(email_clean)
+                if owner is not None and owner.id != row.id:
+                    email_clean = None
+
+            locale_clean = normalize_locale(locale)
+            self._services.user_repo.update_cloud_profile(
+                row.id,
+                role=desired_role,
+                display_name=display_name,
+                email=email_clean,
+                locale=locale_clean,
+                permissions=desired_perms,
+                role_name=desired_name,
+                synced_at=int(time.time()),
+            )
+
+            cached = self._users.get(row.username)
+            if cached is None:
+                cached = User(
+                    id=row.id,
+                    username=row.username,
+                    role=desired_role,
+                    display_name=display_name,
+                    locale=locale_clean,
+                    permissions=list(desired_perms),
+                )
+                self._users[row.username] = cached
+            else:
+                cached.role = desired_role
+                cached.display_name = display_name
+                cached.locale = locale_clean
+                cached.permissions = list(desired_perms)
+            return cached
+
+    def _allocate_cloud_username(self, preferred: str, issuer: str, subject: str) -> str:
+        """Pick a free local username for a cloud projection.
+
+        Local and cloud namespaces are separate, so ``alice`` may exist twice.
+        The cloud row then gets a host suffix, and a numeric one if that is taken
+        too. Login resolves by cloud subject, never by this label.
+        """
+        base = _USERNAME_ALLOWED.sub("", (preferred or "").strip())[:_MAX_USERNAME_LENGTH]
+        if not base:
+            digest = hashlib.sha256(f"{issuer}|{subject}".encode()).hexdigest()[:10]
+            base = f"cloud_{digest}"
+        if self._services.user_repo.get_by_username(base) is None:
+            return base
+        host = issuer.split("://", 1)[-1].split("/", 1)[0]
+        host = _USERNAME_ALLOWED.sub("", host)[:32] or "cloud"
+        candidate = f"{base}@{host}"[:_MAX_USERNAME_LENGTH]
+        if self._services.user_repo.get_by_username(candidate) is None:
+            return candidate
+        for suffix in range(2, 100):
+            marker = f"-{suffix}"
+            candidate = f"{base[: _MAX_USERNAME_LENGTH - len(marker)]}{marker}"
+            if self._services.user_repo.get_by_username(candidate) is None:
+                return candidate
+        raise OctopError(ErrorCode.USERNAME_TAKEN, "no free username for cloud account")
+
     async def bind_sso_identity(
         self,
         *,
@@ -363,6 +516,8 @@ class UserManager:
             row = self._services.user_repo.get(user_id)
             if row is None:
                 raise OctopError(ErrorCode.NOT_FOUND, "user not found")
+            # A bound identity would be a second way into a cloud-owned account.
+            _require_local_account(row, action="single sign-on linking")
             if row.disabled:
                 raise OctopError(ErrorCode.USER_DISABLED, "user is disabled")
             owner = self._services.user_repo.get_by_sso(provider_id, subject)
@@ -412,6 +567,7 @@ class UserManager:
             row = self._services.user_repo.get(user_id)
             if row is None:
                 raise OctopError(ErrorCode.NOT_FOUND, "user not found")
+            _require_local_account(row, action="single sign-on unlinking")
             provider = self._services.sso_repo.get_by_kind(kind)
             if provider is None:
                 raise OctopError(ErrorCode.NOT_FOUND, f"SSO provider {kind!r} not configured")
@@ -482,6 +638,11 @@ class UserManager:
                 row = self._services.user_repo.get_by_email(email)
         if row is None:
             return None
+        if str(getattr(row, "source", "local") or "local") == "cloud":
+            # A cloud projection never holds a local secret; its password lives
+            # upstream, so a local password check cannot succeed and must not
+            # fall through to LDAP either.
+            return None
         now = int(time.time())
         if row.disabled:
             return None
@@ -534,6 +695,7 @@ class UserManager:
         row = self._services.user_repo.get_by_username(username)
         if row is None:
             raise OctopError(ErrorCode.AUTH_FAILED, "current password incorrect")
+        _require_local_account(row, action="password")
         if not row.password_hash:
             # Accounts provisioned from a directory (or SSO) never hold a local
             # password, so "current password incorrect" would be misleading.
@@ -555,6 +717,7 @@ class UserManager:
         row = self._services.user_repo.get_by_username(username)
         if row is None:
             raise OctopError(ErrorCode.NOT_FOUND, "user not found")
+        _require_local_account(row, action="password")
         validate_password_policy(new)
         self._services.user_repo.set_password_hash(row.id, hash_password(new))
         self._services.user_repo.clear_login_lockout(row.id)
@@ -566,6 +729,7 @@ class UserManager:
         row = self._services.user_repo.get_by_username(username)
         if row is None:
             raise OctopError(ErrorCode.NOT_FOUND, "user not found")
+        _require_local_account(row, action="permissions")
         try:
             keys = validate_permission_keys(permissions)
         except ValueError as exc:
@@ -702,6 +866,7 @@ class UserManager:
         row = self._services.user_repo.get_by_username(username)
         if row is None:
             raise OctopError(ErrorCode.NOT_FOUND, "user not found")
+        _require_local_account(row, action="role")
         role_id = str(role)
         self._services.user_repo.set_role(row.id, role_id)
         async with self._lock:
@@ -719,6 +884,7 @@ class UserManager:
         row = self._services.user_repo.get_by_username(username)
         if row is None:
             raise OctopError(ErrorCode.NOT_FOUND, "user not found")
+        _require_local_account(row, action="display_name")
         self._services.user_repo.set_display_name(row.id, display_name)
         async with self._lock:
             current = self._users.get(username)
@@ -729,6 +895,7 @@ class UserManager:
         row = self._services.user_repo.get_by_username(username)
         if row is None:
             raise OctopError(ErrorCode.NOT_FOUND, "user not found")
+        _require_local_account(row, action="email")
         normalized = parse_optional_email(email)
         if normalized is not None:
             owner = self._services.user_repo.get_by_email(normalized)
@@ -810,6 +977,7 @@ class UserManager:
         row = self._services.user_repo.get_by_username(username)
         if row is None:
             raise OctopError(ErrorCode.NOT_FOUND, "user not found")
+        _require_local_account(row, action="disabled")
         async with self._lock:
             self._users.pop(username, None)
         self._services.user_repo.set_disabled(row.id, True)
@@ -854,6 +1022,7 @@ class UserManager:
         row = self._services.user_repo.get_by_username(username)
         if row is None:
             raise OctopError(ErrorCode.NOT_FOUND, "user not found")
+        _require_local_account(row, action="delete")
         owned = self._services.agent_repo.list_by_user(row.id)
         owned_ids = {agent.agent_id for agent in owned}
         if agent_manager is not None:

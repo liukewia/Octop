@@ -331,6 +331,8 @@ class OctopServer:
         self._serve_background = True
         self._sso_service: SsoService | None = None
         self._ldap_service: LdapAuthService | None = None
+        self._cloud_account_service: Any | None = None
+        self._cloud_account_services: SharedServices | None = None
         self._ldap_bind_throttle: LdapBindThrottle | None = None
         self._ldap_bind_throttle_services: SharedServices | None = None
 
@@ -353,6 +355,22 @@ class OctopServer:
         ):
             self._sso_service = SsoServiceCls(self.services, self.user_manager)
         return self._sso_service
+
+    @property
+    def cloud_account_service(self) -> Any:
+        """Process-level cloud account service (keeps its login throttle warm)."""
+        from octop.infra.auth.cloud.service import CloudAccountService as ServiceCls  # noqa: PLC0415
+
+        if self.services is None or self.user_manager is None:
+            raise RuntimeError("cloud account service requires a started server")
+        if (
+            self._cloud_account_service is None
+            or self._cloud_account_services is not self.services
+            or getattr(self._cloud_account_service, "_user_manager", None) is not self.user_manager
+        ):
+            self._cloud_account_service = ServiceCls(self.services, self.user_manager)
+            self._cloud_account_services = self.services
+        return self._cloud_account_service
 
     @property
     def ldap_service(self) -> LdapAuthService:

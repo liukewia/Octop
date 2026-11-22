@@ -6,7 +6,7 @@ import {
   type ReactNode,
 } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Input, Button, Checkbox } from "antd";
+import { Input, Button, Checkbox, Segmented } from "antd";
 import { message } from "@/utils/antdMessage";
 
 import { Fingerprint, KeyRound, Lock, User } from "lucide-react";
@@ -58,6 +58,12 @@ import {
   renewDesktopSession,
 } from "../../api/desktopSession";
 import { isDesktopShell } from "../../utils/desktopBridge";
+import {
+  cloudAuthApi,
+  isCloudMfaChallenge,
+  type CloudAccountStatus,
+  type CloudMfaChallenge,
+} from "../../api/modules/cloudAuth";
 
 // Per page load, not per mount: the point is to stop a renew/refuse cycle from
 // ping-ponging between /login and /chat.
@@ -139,6 +145,11 @@ export default function LoginPage() {
   const [showCreateLocal, setShowCreateLocal] = useState(false);
   const [localAccountExists, setLocalAccountExists] = useState(false);
   const [localLoading, setLocalLoading] = useState(false);
+  // Cloud accounts are optional and live alongside local ones. The switch only
+  // appears when an admin has pointed this installation at a cloud service.
+  const [cloud, setCloud] = useState<CloudAccountStatus | null>(null);
+  const [loginSource, setLoginSource] = useState<"local" | "cloud">("local");
+  const [cloudMfa, setCloudMfa] = useState<CloudMfaChallenge | null>(null);
   const [captcha, setCaptcha] = useState<PublicCaptchaConfig>({
     provider: "slider",
   });
@@ -227,6 +238,14 @@ export default function LoginPage() {
             if (!cancelled) setLdap(next);
           })
           .catch(() => {});
+        cloudAuthApi
+          .status()
+          .then((next) => {
+            if (!cancelled) setCloud(next);
+          })
+          .catch(() => {
+            if (!cancelled) setCloud(null);
+          });
         authApi
           .getPasskeyLoginStatus()
           .then((next) => {
@@ -428,8 +447,50 @@ export default function LoginPage() {
     }
   };
 
+  const handleCloudLogin = async () => {
+    if (!username || !password) return;
+    setLoading(true);
+    try {
+      const res = await cloudAuthApi.login(username, password);
+      if (isCloudMfaChallenge(res)) {
+        setCloudMfa(res);
+        setMfaCode("");
+        // Keep the password: the cloud's second leg needs it again, and this
+        // form never leaves the page.
+        return;
+      }
+      await finishLogin(res.access_token, res.user.locale);
+    } catch (err) {
+      message.error(apiErrorMessage(err, t("login.cloudFailed"), t));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCloudMfaVerify = async () => {
+    if (!cloudMfa || !mfaCode.trim() || !password) return;
+    setLoading(true);
+    try {
+      const res = await cloudAuthApi.login(username, password, {
+        otp: mfaCode.trim(),
+        mfaToken: cloudMfa.mfa_token ?? undefined,
+      });
+      if (isCloudMfaChallenge(res)) return;
+      await finishLogin(res.access_token, res.user.locale);
+    } catch (err) {
+      message.error(apiErrorMessage(err, t("login.mfaFailed"), t));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleLogin = async () => {
-    if (!username || !password || !captchaReady) return;
+    if (loginSource === "cloud") {
+      await handleCloudLogin();
+      return;
+    }
+    if (!username || !password || (loginSource === "local" && !captchaReady))
+      return;
     setLoading(true);
     try {
       const token = await captchaRef.current?.getToken();
@@ -562,6 +623,84 @@ export default function LoginPage() {
       }}
     />
   );
+
+  if (cloudMfa) {
+    return (
+      <div
+        style={{
+          minHeight: "100dvh",
+          boxSizing: "border-box",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding:
+            "max(24px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(24px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px))",
+          background: "var(--fn-bg-layout)",
+          transition: "background var(--fn-transition)",
+        }}
+      >
+        <div style={cardStyle}>
+          {logo}
+          <h2
+            style={{
+              fontSize: 20,
+              fontWeight: 600,
+              color: "var(--fn-text-primary)",
+              margin: 0,
+              textAlign: "center",
+            }}
+          >
+            {t("login.mfaTitle")}
+          </h2>
+          <p
+            style={{
+              margin: 0,
+              fontSize: 13,
+              lineHeight: 1.5,
+              color: "var(--fn-text-tertiary)",
+              textAlign: "center",
+            }}
+          >
+            {t("login.cloudMfaHint", { name: cloudMfa.user_hint })}
+          </p>
+          <Input
+            prefix={
+              <Lock size={16} style={{ color: "var(--fn-text-quaternary)" }} />
+            }
+            placeholder={t("login.mfaTotpPlaceholder")}
+            aria-label={t("login.mfaTotp")}
+            size="large"
+            value={mfaCode}
+            onChange={(e) => setMfaCode(e.target.value)}
+            onPressEnter={() => void handleCloudMfaVerify()}
+            autoFocus
+            autoComplete="one-time-code"
+            style={{ borderRadius: 10 }}
+          />
+          <Button
+            type="primary"
+            size="large"
+            block
+            loading={loading}
+            onClick={() => void handleCloudMfaVerify()}
+            disabled={!mfaCode.trim()}
+            style={{ borderRadius: 10, height: 44, fontWeight: 500 }}
+          >
+            {t("login.mfaVerify")}
+          </Button>
+          <Button
+            type="link"
+            onClick={() => {
+              setCloudMfa(null);
+              setMfaCode("");
+            }}
+          >
+            {t("login.mfaBack")}
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (mfaChallenge) {
     const methods = mfaChallenge.methods;
@@ -742,6 +881,25 @@ export default function LoginPage() {
       <div style={cardStyle}>
         {logo}
 
+        {cloud?.enabled ? (
+          <Segmented
+            block
+            value={loginSource}
+            onChange={(value) => {
+              setLoginSource(value as "local" | "cloud");
+              setCloudMfa(null);
+              setMfaCode("");
+            }}
+            options={[
+              { label: t("login.sourceLocal"), value: "local" },
+              {
+                label: t("login.sourceCloud", { name: cloud.display_name }),
+                value: "cloud",
+              },
+            ]}
+          />
+        ) : null}
+
         <h2
           style={{
             fontSize: 20,
@@ -782,7 +940,7 @@ export default function LoginPage() {
           style={{ borderRadius: 10 }}
         />
 
-        {ldap?.enabled && (
+        {loginSource === "local" && ldap?.enabled && (
           <p
             style={{
               margin: 0,
@@ -800,15 +958,17 @@ export default function LoginPage() {
           </p>
         )}
 
-        <CaptchaField
-          ref={captchaRef}
-          config={captcha}
-          resetKey={captchaResetKey}
-          slideHint={t("login.slideHint")}
-          slideVerifiedLabel={t("login.slideVerified")}
-          unsupportedLabel={t("login.unsupportedCaptcha")}
-          onReadyChange={setCaptchaReady}
-        />
+        {loginSource === "local" ? (
+          <CaptchaField
+            ref={captchaRef}
+            config={captcha}
+            resetKey={captchaResetKey}
+            slideHint={t("login.slideHint")}
+            slideVerifiedLabel={t("login.slideVerified")}
+            unsupportedLabel={t("login.unsupportedCaptcha")}
+            onReadyChange={setCaptchaReady}
+          />
+        ) : null}
 
         <div
           style={{
@@ -830,24 +990,26 @@ export default function LoginPage() {
           >
             {t("login.remember")}
           </Checkbox>
-          <button
-            type="button"
-            data-testid="login-forgot-password-toggle"
-            onClick={() => setShowForgotHelp(true)}
-            style={{
-              margin: 0,
-              padding: 0,
-              border: "none",
-              background: "none",
-              cursor: "pointer",
-              fontSize: 13,
-              lineHeight: 1.5,
-              color: "var(--fn-text-tertiary)",
-              flexShrink: 0,
-            }}
-          >
-            {t("login.forgotPassword", "Forgot password?")}
-          </button>
+          {loginSource === "local" ? (
+            <button
+              type="button"
+              data-testid="login-forgot-password-toggle"
+              onClick={() => setShowForgotHelp(true)}
+              style={{
+                margin: 0,
+                padding: 0,
+                border: "none",
+                background: "none",
+                cursor: "pointer",
+                fontSize: 13,
+                lineHeight: 1.5,
+                color: "var(--fn-text-tertiary)",
+                flexShrink: 0,
+              }}
+            >
+              {t("login.forgotPassword", "Forgot password?")}
+            </button>
+          ) : null}
         </div>
         <ForgotPasswordModal
           open={showForgotHelp}
@@ -860,11 +1022,45 @@ export default function LoginPage() {
           block
           loading={loading}
           onClick={handleLogin}
-          disabled={!username || !password || !captchaReady}
+          disabled={
+            !username || !password || (loginSource === "local" && !captchaReady)
+          }
           style={{ borderRadius: 10, height: 44, fontWeight: 500 }}
         >
           {t("login.submit")}
         </Button>
+
+        {loginSource === "cloud" ? (
+          <p
+            style={{
+              margin: 0,
+              width: "100%",
+              fontSize: 12,
+              lineHeight: 1.5,
+              color: "var(--fn-text-tertiary)",
+              textAlign: "center",
+            }}
+          >
+            {t("login.cloudManagedHint", {
+              name: cloud?.display_name ?? "",
+            })}
+          </p>
+        ) : null}
+
+        {loginSource === "cloud" && cloud?.signup_url ? (
+          <Button
+            size="large"
+            block
+            onClick={() => {
+              if (cloud.signup_url) {
+                window.open(cloud.signup_url, "_blank", "noopener");
+              }
+            }}
+            style={{ borderRadius: 10, height: 44, fontWeight: 500 }}
+          >
+            {t("login.cloudSignup")}
+          </Button>
+        ) : null}
 
         {passwordlessLogin ? (
           passkeyAvailable && !passkeyIpHost ? (

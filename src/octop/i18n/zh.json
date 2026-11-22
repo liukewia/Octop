@@ -570,7 +570,14 @@
     "WEBAUTHN_LOGIN_DISABLED": "登录页的通行密钥登录已关闭。管理员可在「应用设置 → 通行密钥」中开启。",
     "GIT_NO_CHANGES": "没有可提交的更改。",
     "GIT_COMMIT_MESSAGE_INVALID": "模型没有返回可用的提交信息，请手动填写。",
-    "GIT_PUSH_DETACHED": "当前处于 detached HEAD，无法推送。"
+    "GIT_PUSH_DETACHED": "当前处于 detached HEAD，无法推送。",
+    "CLOUD_ACCOUNT_NOT_CONFIGURED": "尚未配置云端账号服务，或云端登录已被关闭。",
+    "CLOUD_ACCOUNT_UNAVAILABLE": "云端账号服务当前不可达，请稍后再试。",
+    "CLOUD_ACCOUNT_MFA_REQUIRED": "该云端账号需要二次验证。",
+    "CLOUD_ACCOUNT_DISABLED": "该云端账号已被停用。",
+    "CLOUD_ACCOUNT_SESSION_REVOKED": "云端会话已失效，请重新登录。",
+    "CLOUD_MANAGED_ACCOUNT": "该账号由云端管控，本地不能修改密码、角色或权限。",
+    "CLOUD_ACCOUNT_BAD_REQUEST": "云端账号配置不合法：{message}"
   },
   "desktop": {
     "install_log_deps": "正在安装 Python 依赖…",

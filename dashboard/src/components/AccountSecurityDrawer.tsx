@@ -1,10 +1,27 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { Alert, Button, Drawer, Form, Input, Modal, Space, Spin } from "antd";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import {
+  Alert,
+  Button,
+  Drawer,
+  Form,
+  Input,
+  Modal,
+  Space,
+  Spin,
+  Tag,
+} from "antd";
 import {
   Fingerprint,
   KeyRound,
   Lock,
   LockOpen,
+  MonitorSmartphone,
   ShieldCheck,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
@@ -18,6 +35,7 @@ import {
   type MfaStatus,
   type OctopUser,
 } from "../api/modules/auth";
+import { cloudAuthApi, type CloudSessionInfo } from "../api/modules/cloudAuth";
 import { apiErrorMessage, isNotFoundApiError } from "../utils/apiError";
 import {
   formatServerDateTime,
@@ -205,6 +223,170 @@ function ChangePasswordCard() {
   );
 }
 
+/**
+ * Sign-ins that still work for a cloud account. The cloud owns the credential,
+ * so the one security control this installation can offer is dropping a device.
+ */
+function CloudSessionsCard() {
+  const { t } = useTranslation();
+  const timeZone = useServerTimezone();
+  const [rows, setRows] = useState<CloudSessionInfo[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  // Latest-ref: the fetch must not restart just because ``t`` got a new
+  // identity, or the effect below would refetch on every render.
+  const tRef = useRef(t);
+  tRef.current = t;
+
+  const load = useCallback(async () => {
+    const translate = tRef.current;
+    try {
+      const result = await cloudAuthApi.sessions();
+      setRows(result.sessions);
+    } catch (err) {
+      setRows([]);
+      message.error(
+        apiErrorMessage(
+          err,
+          translate("account.cloudSessionsLoadFailed"),
+          translate,
+        ),
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const formatTime = (raw: number) => {
+    const sec = Number(raw);
+    if (!Number.isFinite(sec) || sec <= 0) return "—";
+    return formatServerDateTime(
+      sec > 1e12 ? Math.floor(sec / 1000) : sec,
+      timeZone,
+    );
+  };
+
+  const revoke = async (sessionId: string) => {
+    setBusy(true);
+    try {
+      await cloudAuthApi.revokeSession(sessionId);
+      message.success(t("account.cloudSessionRevoked"));
+      await load();
+    } catch (err) {
+      message.error(
+        apiErrorMessage(err, t("account.cloudSessionRevokeFailed"), t),
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const revokeOthers = () => {
+    Modal.confirm({
+      title: t("account.cloudRevokeOthersTitle"),
+      content: t("account.cloudRevokeOthersHint"),
+      okText: t("common.confirm"),
+      okButtonProps: { danger: true },
+      cancelText: t("common.cancel"),
+      onOk: async () => {
+        setBusy(true);
+        try {
+          const result = await cloudAuthApi.revokeOtherSessions();
+          message.success(
+            t("account.cloudSessionsRevoked", { count: result.revoked }),
+          );
+          await load();
+        } catch (err) {
+          message.error(
+            apiErrorMessage(err, t("account.cloudSessionRevokeFailed"), t),
+          );
+        } finally {
+          setBusy(false);
+        }
+      },
+    });
+  };
+
+  const others = (rows ?? []).filter((row) => !row.current).length;
+
+  return (
+    <section className={styles.card}>
+      <div className={styles.cardTop}>
+        <div className={styles.cardLead}>
+          <span
+            className={cx(
+              styles.iconWrap,
+              (rows?.length ?? 0) > 0 && styles.iconWrapOn,
+            )}
+            aria-hidden
+          >
+            <MonitorSmartphone size={18} strokeWidth={1.75} />
+          </span>
+          <div className={styles.cardIdentity}>
+            <h3 className={styles.cardTitle}>{t("account.cloudSessions")}</h3>
+            {rows && rows.length > 1 ? (
+              <span className={cx(styles.statusPill, styles.statusPillOn)}>
+                {t("account.cloudSessionCount", { count: rows.length })}
+              </span>
+            ) : null}
+          </div>
+        </div>
+        <div className={styles.cardSide}>
+          <p className={styles.cardDesc}>{t("account.cloudSessionsDesc")}</p>
+          {others > 0 ? (
+            <div className={styles.cardActions}>
+              <Button danger disabled={busy} onClick={revokeOthers}>
+                {t("account.cloudRevokeOthers")}
+              </Button>
+            </div>
+          ) : null}
+        </div>
+      </div>
+      <div className={styles.cardExtra}>
+        {rows === null ? (
+          <Spin />
+        ) : rows.length === 0 ? (
+          <p className={styles.cardDesc}>{t("account.cloudSessionsEmpty")}</p>
+        ) : (
+          <ul className={styles.passkeyList}>
+            {rows.map((row) => (
+              <li key={row.session_id} className={styles.passkeyRow}>
+                <div className={styles.passkeyMeta}>
+                  <span className={styles.passkeyName}>
+                    {row.device_label?.trim() ||
+                      t("account.cloudSessionUnknownDevice")}
+                    {row.current ? (
+                      <Tag color="blue">{t("account.cloudSessionCurrent")}</Tag>
+                    ) : null}
+                  </span>
+                  <span className={styles.passkeySub}>
+                    {t("account.cloudSessionMeta", {
+                      lastSeen: formatTime(row.last_seen_at),
+                      created: formatTime(row.created_at),
+                    })}
+                  </span>
+                </div>
+                {row.current ? null : (
+                  <Button
+                    type="text"
+                    danger
+                    size="small"
+                    disabled={busy}
+                    onClick={() => void revoke(row.session_id)}
+                  >
+                    {t("account.cloudRevoke")}
+                  </Button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
+  );
+}
+
 type ReauthAction =
   | { kind: "totp_begin" }
   | { kind: "totp_disable" }
@@ -228,6 +410,9 @@ export default function AccountSecurityDrawer({
   const { t } = useTranslation();
   const isMobile = useIsMobile();
   const timeZone = useServerTimezone();
+  // Latest-ref so the loader below does not restart when ``t`` changes identity.
+  const tRef = useRef(t);
+  tRef.current = t;
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<MfaStatus | null>(null);
   const [profile, setProfile] = useState<OctopUser | null>(null);
@@ -253,24 +438,38 @@ export default function AccountSecurityDrawer({
   const passkeyReady = passkeyOk && passkeyBlock == null;
 
   const loadStatus = useCallback(async () => {
+    const translate = tRef.current;
     setLoading(true);
     setUnavailable(false);
-    const mePromise = authApi.me().catch(() => null);
     try {
-      setStatus(await authApi.mfaStatus());
-    } catch (err) {
-      if (isNotFoundApiError(err)) {
-        setUnavailable(true);
+      const me = await authApi.me().catch(() => null);
+      if (me) setProfile(me);
+      if (me?.cloud_managed) {
+        // The cloud owns password, factors, and permissions, so the local MFA
+        // routes have nothing to report for this account.
         setStatus(null);
-      } else {
-        message.error(apiErrorMessage(err, t("account.securityLoadFailed"), t));
+        return;
+      }
+      try {
+        setStatus(await authApi.mfaStatus());
+      } catch (err) {
+        if (isNotFoundApiError(err)) {
+          setUnavailable(true);
+          setStatus(null);
+        } else {
+          message.error(
+            apiErrorMessage(
+              err,
+              translate("account.securityLoadFailed"),
+              translate,
+            ),
+          );
+        }
       }
     } finally {
-      const me = await mePromise;
-      if (me) setProfile(me);
       setLoading(false);
     }
-  }, [t]);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -404,6 +603,7 @@ export default function AccountSecurityDrawer({
     return t("account.securityPasskeyLastUsed", { time: formatted });
   };
 
+  const cloudManaged = Boolean(profile?.cloud_managed);
   const hasPassword = profile?.has_password !== false;
   const ssoLinked = Boolean(
     profile?.sso_linked || (profile?.sso_identities?.length ?? 0) > 0,
@@ -419,6 +619,21 @@ export default function AccountSecurityDrawer({
       {loading ? (
         <div className={styles.loading}>
           <Spin />
+        </div>
+      ) : cloudManaged ? (
+        <div className={styles.stack}>
+          <div className={styles.introBlock}>
+            <p className={styles.intro}>{t("account.cloudManagedTitle")}</p>
+            <p className={styles.note}>{t("account.cloudManagedHint")}</p>
+            {profile?.cloud_issuer ? (
+              <p className={styles.note}>
+                {t("account.cloudManagedIssuer", {
+                  issuer: profile.cloud_issuer,
+                })}
+              </p>
+            ) : null}
+          </div>
+          <CloudSessionsCard />
         </div>
       ) : (
         <>

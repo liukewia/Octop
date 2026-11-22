@@ -39,6 +39,7 @@ def sign_token(
     password_version: int = 0,
     amr: str | None = None,
     jti: str | None = None,
+    cloud_session: str | None = None,
 ) -> str:
     """Mint a JWT. ``purpose`` is required; missing purpose must fail closed."""
     if purpose not in _VALID_PURPOSES:
@@ -55,6 +56,10 @@ def sign_token(
     if purpose == PURPOSE_ACCESS:
         payload["mfa_version"] = int(mfa_version)
         payload["password_version"] = int(password_version)
+        # Cloud sign-ins carry their local session id so it can be revoked
+        # without waiting for the JWT to expire.
+        if cloud_session:
+            payload["cs"] = cloud_session
     elif purpose == PURPOSE_MFA:
         payload["mfa_version"] = int(mfa_version)
         if amr is None:
@@ -66,9 +71,14 @@ def sign_token(
     return jwt.encode(payload, secret, algorithm="HS256")
 
 
-def decode_token(secret: bytes, token: str) -> dict[str, Any]:
+def decode_token(secret: bytes, token: str, *, verify_expiry: bool = True) -> dict[str, Any]:
     try:
-        payload = jwt.decode(token, secret, algorithms=["HS256"])
+        payload = jwt.decode(
+            token,
+            secret,
+            algorithms=["HS256"],
+            options={} if verify_expiry else {"verify_exp": False},
+        )
         if "sub" in payload:
             payload["sub"] = int(payload["sub"])
         return payload
@@ -96,6 +106,16 @@ def token_mfa_version(payload: dict[str, Any]) -> int:
 def token_password_version(payload: dict[str, Any]) -> int:
     """Absent ``password_version`` claim ≡ 0 (tokens issued before the claim existed)."""
     return _optional_int_claim(payload, "password_version")
+
+
+def token_cloud_session(payload: dict[str, Any]) -> str | None:
+    """Local cloud session id, or ``None`` for a local account token."""
+    raw = payload.get("cs")
+    if raw is None:
+        return None
+    if not isinstance(raw, str) or not raw.strip():
+        raise InvalidToken("invalid cloud session claim")
+    return raw.strip()
 
 
 def _optional_int_claim(payload: dict[str, Any], key: str) -> int:

@@ -40,6 +40,10 @@ def me_payload(user: Any, server: Any) -> dict[str, Any]:
     """Profile JSON for ``/auth/me`` and OAuth bind/unbind responses."""
     payload = _user_json(user, locale=user.locale)
     row = server.user_manager.get_row(user.id)
+    account_source = str(getattr(row, "source", "local") or "local") if row is not None else "local"
+    payload["account_source"] = account_source
+    payload["cloud_managed"] = account_source == "cloud"
+    payload["cloud_issuer"] = getattr(row, "cloud_issuer", None) if row is not None else None
     if row is None:
         payload["sso_linked"] = False
         payload["sso_kind"] = None

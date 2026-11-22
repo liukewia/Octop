@@ -13,6 +13,7 @@ GATED_FILES = [
     "routers/users.py",
     "routers/admin.py",
     "routers/app_config.py",
+    "routers/admin_cloud.py",
     "routers/backup.py",
     "routers/security.py",
     "routers/providers.py",

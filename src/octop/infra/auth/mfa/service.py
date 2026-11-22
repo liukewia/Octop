@@ -85,11 +85,17 @@ class MfaService:
 
     # --- access / mfa tokens ----------------------------------------------
 
-    def mint_access_token(self, user: User) -> tuple[str, int]:
+    def mint_access_token(
+        self,
+        user: User,
+        *,
+        cloud_session: str | None = None,
+        ttl_seconds: int | None = None,
+    ) -> tuple[str, int]:
         secret = self._s.secret_repo.get("jwt")
         if secret is None:
             raise OctopError(ErrorCode.INTERNAL_ERROR, "jwt secret missing")
-        ttl = int(self._s.config.access_token_ttl_seconds)
+        ttl = int(ttl_seconds if ttl_seconds is not None else self._s.config.access_token_ttl_seconds)
         token = sign_token(
             secret,
             sub=user.id,
@@ -99,6 +105,7 @@ class MfaService:
             ttl_seconds=ttl,
             mfa_version=self._mfa_version(user.id),
             password_version=self._password_version(user.id),
+            cloud_session=cloud_session,
         )
         return token, ttl
 

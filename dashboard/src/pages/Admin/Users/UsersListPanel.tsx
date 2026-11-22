@@ -143,6 +143,11 @@ interface UserRow {
   default_backend_type?: string | null;
   /** Present when the users list includes MFA status from the backend. */
   mfa_active?: boolean;
+  /** ``cloud`` rows are a projection of a cloud account and stay read-only. */
+  source?: "local" | "cloud";
+  cloud_managed?: boolean;
+  cloud_issuer?: string | null;
+  cloud_synced_at?: number | null;
 }
 
 export interface PermissionCatalogItem {
@@ -1580,7 +1585,11 @@ function UserCardGrid({
                   <Bot size={14} />
                   {t("adminUsers.colAgents")} {agentsLoading ? "…" : agentCount}
                 </button>
-                {row.directory ? (
+                {row.cloud_managed ? (
+                  <span title={row.cloud_issuer ?? undefined}>
+                    {t("adminUsers.cloudBadge")}
+                  </span>
+                ) : row.directory ? (
                   <span>{t("adminUsers.directoryBadge")}</span>
                 ) : row.sso_linked ? (
                   <span>{t("adminUsers.ssoBadge")}</span>
@@ -1620,10 +1629,16 @@ function UserCardGrid({
               <Switch
                 size="small"
                 checked={!row.disabled}
+                disabled={row.cloud_managed}
                 onChange={(checked) =>
                   void onTogglePatch(row, { disabled: !checked })
                 }
                 aria-label={t("common.enabled")}
+                title={
+                  row.cloud_managed
+                    ? t("adminUsers.cloudManagedHint")
+                    : undefined
+                }
               />
               <Tooltip title={t("common.edit")} mouseEnterDelay={0.5}>
                 <button

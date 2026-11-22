@@ -19,6 +19,7 @@ from octop.infra.db.repos.backends import BackendRepo
 from octop.infra.db.repos.bridge_connections import BridgeConnectionRepo
 from octop.infra.db.repos.care_push import CarePushRepo
 from octop.infra.db.repos.channels import ChannelRepo
+from octop.infra.db.repos.cloud_sessions import CloudSessionRepo
 from octop.infra.db.repos.connectors import ConnectorRepo
 from octop.infra.db.repos.control_files import ControlFileRepo
 from octop.infra.db.repos.cron import CronJobRepo
@@ -80,6 +81,7 @@ class RepoBundle:
     care_push_repo: CarePushRepo
     proactive_care_config_repo: ProactiveCareConfigRepo
     sso_repo: SsoRepo
+    cloud_session_repo: CloudSessionRepo
     user_group_repo: UserGroupRepo
     user_group_member_repo: UserGroupMemberRepo
     resource_group_grant_repo: ResourceGroupGrantRepo
@@ -121,6 +123,7 @@ class RepoBundle:
             care_push_repo=CarePushRepo(db),
             proactive_care_config_repo=ProactiveCareConfigRepo(db),
             sso_repo=SsoRepo(db),
+            cloud_session_repo=CloudSessionRepo(db),
             user_group_repo=UserGroupRepo(db),
             user_group_member_repo=UserGroupMemberRepo(db),
             resource_group_grant_repo=ResourceGroupGrantRepo(db),
@@ -246,6 +249,10 @@ class SharedServices:
     @property
     def sso_repo(self) -> SsoRepo:
         return self.repos.sso_repo
+
+    @property
+    def cloud_session_repo(self) -> CloudSessionRepo:
+        return self.repos.cloud_session_repo
 
     @property
     def user_totp_repo(self) -> UserTotpRepo:
