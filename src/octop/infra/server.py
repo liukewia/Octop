@@ -359,7 +359,9 @@ class OctopServer:
     @property
     def cloud_account_service(self) -> Any:
         """Process-level cloud account service (keeps its login throttle warm)."""
-        from octop.infra.auth.cloud.service import CloudAccountService as ServiceCls  # noqa: PLC0415
+        from octop.infra.auth.cloud.service import (
+            CloudAccountService as ServiceCls,  # noqa: PLC0415
+        )
 
         if self.services is None or self.user_manager is None:
             raise RuntimeError("cloud account service requires a started server")

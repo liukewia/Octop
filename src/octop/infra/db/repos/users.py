@@ -233,9 +233,7 @@ class UserRepo:
     def count_by_source(self, source: str) -> int:
         with self._db.connect() as conn:
             return int(
-                conn.execute(
-                    "SELECT COUNT(*) FROM users WHERE source = ?", (source,)
-                ).fetchone()[0]
+                conn.execute("SELECT COUNT(*) FROM users WHERE source = ?", (source,)).fetchone()[0]
             )
 
     def get(self, user_id: int) -> UserRow | None:

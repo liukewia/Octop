@@ -95,7 +95,9 @@ class MfaService:
         secret = self._s.secret_repo.get("jwt")
         if secret is None:
             raise OctopError(ErrorCode.INTERNAL_ERROR, "jwt secret missing")
-        ttl = int(ttl_seconds if ttl_seconds is not None else self._s.config.access_token_ttl_seconds)
+        ttl = int(
+            ttl_seconds if ttl_seconds is not None else self._s.config.access_token_ttl_seconds
+        )
         token = sign_token(
             secret,
             sub=user.id,

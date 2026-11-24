@@ -34,7 +34,9 @@ async def test_setup_required_then_login(client):
 async def test_login_cookie_authenticates_without_bearer(client):
     c, _, home = client
     await bootstrap_admin(c, home, username="alice", password="TestPass12")
-    logged_in = await c.post("/api/auth/login", json={"username": "alice", "password": "TestPass12"})
+    logged_in = await c.post(
+        "/api/auth/login", json={"username": "alice", "password": "TestPass12"}
+    )
     assert logged_in.status_code == 200
     assert logged_in.json()["access_token"]
     issued = logged_in.headers.get("set-cookie") or ""
