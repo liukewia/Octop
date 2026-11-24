@@ -25,6 +25,11 @@ from octop.infra.db.repos.sessions import SessionRow
 from octop.infra.errors import ErrorCode, OctopError
 from octop.infra.gateway.cli import CLI_CHANNEL_ID, CliChannel, CliHub
 from octop.infra.gateway.history_backfill import HistoryBackfillQueue
+from octop.infra.gateway.notifications import (
+    DashboardNoticeKind,
+    HitlNoticeSubtype,
+    push_dashboard_notice,
+)
 from octop.infra.gateway.process import media_backend_for_agent
 from octop.infra.gateway.process.processor import GlobalProcessor
 from octop.infra.gateway.process.response_mode import (
@@ -579,27 +584,58 @@ class Gateway:
             metadata=metadata,
         )
 
+    def _agent_display_name(self, agent_id: str) -> str:
+        row = self._agent_manager.get_row(agent_id)
+        name = getattr(row, "name", None) if row is not None else None
+        return str(name).strip() if isinstance(name, str) and name.strip() else agent_id
+
+    async def notify_dashboard_event(
+        self,
+        *,
+        user_id: int,
+        agent_id: str,
+        thread_id: str,
+        kind: DashboardNoticeKind,
+        text: str = "",
+        event_id: str | None = None,
+        hitl_subtype: HitlNoticeSubtype | None = None,
+        agent_name_override: str | None = None,
+    ) -> None:
+        """Fan out a structured notification event to the user's dashboard sockets."""
+        agent_name = (
+            agent_name_override.strip()
+            if isinstance(agent_name_override, str) and agent_name_override.strip()
+            else self._agent_display_name(agent_id)
+        )
+        await push_dashboard_notice(
+            self._ws_hub,
+            user_id=user_id,
+            agent_id=agent_id,
+            thread_id=thread_id,
+            kind=kind,
+            text=text,
+            agent_name=agent_name,
+            event_id=event_id,
+            hitl_subtype=hitl_subtype,
+        )
+
     async def notify_dashboard_push(
         self,
         session: SessionRow,
         agent_id: str,
         text: str,
+        *,
+        kind: DashboardNoticeKind = "proactive_push",
+        event_id: str | None = None,
     ) -> None:
         """Fan out a toast payload to the owner's dashboard notification sockets."""
-        if not text.strip():
-            return
-        row = self._agent_manager.get_row(agent_id)
-        name = getattr(row, "name", None) if row is not None else None
-        agent_name = str(name).strip() if isinstance(name, str) and name.strip() else agent_id
-        await self._ws_hub.push_to_user(
-            session.user_id,
-            {
-                "type": "dashboard_push",
-                "agent_id": agent_id,
-                "thread_id": session.thread_id,
-                "text": text,
-                "agent_name": agent_name,
-            },
+        await self.notify_dashboard_event(
+            user_id=session.user_id,
+            agent_id=agent_id,
+            thread_id=session.thread_id,
+            kind=kind,
+            text=text,
+            event_id=event_id,
         )
 
     def _require_channel_manager(self) -> ChannelManager:

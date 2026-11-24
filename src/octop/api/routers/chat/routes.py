@@ -32,8 +32,9 @@ from octop.infra.gateway.hitl.coordinator import (
 )
 from octop.infra.gateway.hitl.format import normalize_hitl_request
 from octop.infra.gateway.hitl.store import HitlPendingRecord
+from octop.infra.gateway.notifications import summarize_hitl_notice
 from octop.infra.text_assist import require_host_models, run_text_assist
-from octop.infra.utils.locale import resolve_request_locale
+from octop.infra.utils.locale import normalize_locale, resolve_request_locale
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -112,7 +113,6 @@ async def iter_dashboard_hitl_resume_sse(
     rejected = any(isinstance(d, dict) and d.get("type") == "reject" for d in decisions)
     if pending is not None and pending.resume_agent_id:
         from octop.i18n.domains.slash import tr as slash_tr  # noqa: PLC0415
-        from octop.infra.utils.locale import normalize_locale  # noqa: PLC0415
 
         teams = getattr(processor, "teams", None)
         deliver = getattr(teams, "deliver_member_hitl", None) if teams is not None else None
@@ -145,6 +145,10 @@ async def iter_dashboard_hitl_resume_sse(
     )
     disconnected = False
     followup_pause = False
+    error_text = ""
+    reply_parts: list[str] = []
+    gateway = getattr(getattr(server, "app_runtime", None), "gateway", None)
+    norm_locale = normalize_locale(locale)
     # Clear the in-memory pause before the (possibly long) resume stream so
     # history reload cannot reinject the same card while the turn continues.
     if pending is not None:
@@ -161,14 +165,40 @@ async def iter_dashboard_hitl_resume_sse(
         ):
             if not disconnected:
                 disconnected = await is_disconnected()
-            if isinstance(chunk, dict) and chunk.get("type") == "hitl_required":
-                followup_pause = True
-                request_payload = chunk.get("request")
-                if isinstance(request_payload, dict):
-                    request_payload = normalize_hitl_request(request_payload)
-                    record = hitl_coordinator.register_from_request(request_payload, ctx=hitl_ctx)
-                    request_payload["pending_id"] = record.pending_id
-                    chunk["request"] = request_payload
+            if isinstance(chunk, dict):
+                kind = chunk.get("type")
+                if kind in ("token", "delta"):
+                    piece = chunk.get("content") or chunk.get("text")
+                    if isinstance(piece, str) and piece:
+                        reply_parts.append(piece)
+                elif kind == "error":
+                    error_text = str(chunk.get("message") or "")
+                elif kind == "hitl_required":
+                    followup_pause = True
+                    request_payload = chunk.get("request")
+                    next_pending_id = ""
+                    if isinstance(request_payload, dict):
+                        request_payload = normalize_hitl_request(request_payload)
+                        record = hitl_coordinator.register_from_request(
+                            request_payload, ctx=hitl_ctx
+                        )
+                        request_payload["pending_id"] = record.pending_id
+                        chunk["request"] = request_payload
+                        next_pending_id = record.pending_id
+                    subtype, summary = summarize_hitl_notice(
+                        request_payload if isinstance(request_payload, dict) else None,
+                        locale=norm_locale,
+                    )
+                    if gateway is not None:
+                        await gateway.notify_dashboard_event(
+                            user_id=user_id,
+                            agent_id=agent_id,
+                            thread_id=thread_id,
+                            kind="hitl_required",
+                            text=summary,
+                            event_id=f"hitl:{next_pending_id or thread_id}",
+                            hitl_subtype=subtype,
+                        )
             if not disconnected:
                 yield format_sse("chunk", chunk)
         # A new approval card is still pending. Draining now would start a
@@ -184,10 +214,14 @@ async def iter_dashboard_hitl_resume_sse(
         # Steers parked across the HITL pause drain at this
         # boundary and continue through a normal WS turn — also when the SSE
         # client disconnected, because the resume itself completed here.
-        from octop.infra.gateway.ws.ws_channel import resume_parked_steers  # noqa: PLC0415
+        from octop.infra.gateway.ws.ws_channel import (  # noqa: PLC0415
+            _has_busy_team_members,
+            resume_parked_steers,
+        )
 
+        continued = False
         try:
-            await resume_parked_steers(
+            continued = await resume_parked_steers(
                 server,
                 agent_id=agent_id,
                 thread_id=thread_id,
@@ -197,14 +231,40 @@ async def iter_dashboard_hitl_resume_sse(
             )
         except Exception:
             logging.getLogger(__name__).exception("steer resume drain failed thread=%s", thread_id)
+        if gateway is not None:
+            if error_text:
+                await gateway.notify_dashboard_event(
+                    user_id=user_id,
+                    agent_id=agent_id,
+                    thread_id=thread_id,
+                    kind="task_failed",
+                    text=error_text,
+                )
+            elif not continued and not _has_busy_team_members(processor, agent_id):
+                await gateway.notify_dashboard_event(
+                    user_id=user_id,
+                    agent_id=agent_id,
+                    thread_id=thread_id,
+                    kind="task_completed",
+                    text="".join(reply_parts),
+                )
     except Exception as exc:
         # Resume failed after we cleared the pause for reinject safety — do not
         # leave the record looking like a successful approve/reject.
         if pending is not None:
             hitl_coordinator.store.mark_resolved(pending.pending_id, "expired")
+        formatted = format_stream_error(exc, locale)
+        if gateway is not None:
+            await gateway.notify_dashboard_event(
+                user_id=user_id,
+                agent_id=agent_id,
+                thread_id=thread_id,
+                kind="task_failed",
+                text=formatted,
+            )
         yield format_sse(
             "chunk",
-            {"type": "error", "message": format_stream_error(exc, locale)},
+            {"type": "error", "message": formatted},
         )
 
 

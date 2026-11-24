@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -92,31 +93,36 @@ class CronDeliveryService:
             )
 
         async def _locked() -> None:
-            session = self._gateway.require_session(command.agent_id, session_key)
-            if session.user_id != command.user_id:
-                raise ValueError(
-                    f"session {command.session_key!r} does not belong to user {command.user_id!r}"
-                )
-            if command.fresh_thread:
-                # Reuse the recovery thread if it is still empty when we acquire the lock.
-                recovered = (
-                    registry.get_thread(session.thread_id)
-                    if session.thread_id == recovered_thread_id
-                    else None
-                )
-                if recovered is None or recovered.last_active > 0:
-                    await registry.reset_by_session_key(session_key)
-            elif pinned:
-                await self._bind_pinned_thread(session_key, pinned)
-            else:
-                await self._bind_latest_thread(session_key)
-            session = self._gateway.require_session(command.agent_id, session_key)
-            if command.task_type == "text":
-                await self._publish_fixed(command, session, command.prompt)
-            elif command.task_type == "script":
-                await self._deliver_script(command, session)
-            else:
-                await self._deliver_agent(command, session)
+            session: SessionRow | None = None
+            try:
+                session = self._gateway.require_session(command.agent_id, session_key)
+                if session.user_id != command.user_id:
+                    raise ValueError(
+                        f"session {command.session_key!r} does not belong to user {command.user_id!r}"
+                    )
+                if command.fresh_thread:
+                    # Reuse the recovery thread if it is still empty when we acquire the lock.
+                    recovered = (
+                        registry.get_thread(session.thread_id)
+                        if session.thread_id == recovered_thread_id
+                        else None
+                    )
+                    if recovered is None or recovered.last_active > 0:
+                        await registry.reset_by_session_key(session_key)
+                elif pinned:
+                    await self._bind_pinned_thread(session_key, pinned)
+                else:
+                    await self._bind_latest_thread(session_key)
+                session = self._gateway.require_session(command.agent_id, session_key)
+                if command.task_type == "text":
+                    await self._publish_fixed(command, session, command.prompt)
+                elif command.task_type == "script":
+                    await self._deliver_script(command, session)
+                else:
+                    await self._deliver_agent(command, session)
+            except Exception as exc:
+                await self._notify_failure_best_effort(session, session_key, command, exc)
+                raise
 
         await self._gateway.run_in_session(
             command.agent_id,
@@ -129,6 +135,8 @@ class CronDeliveryService:
         command: CronDeliveryCommand,
         session: SessionRow,
         outbound: str,
+        *,
+        notice_kind: str = "proactive_push",
     ) -> None:
         projected: list[ThreadMessageInput] = []
         title_source = outbound
@@ -167,7 +175,9 @@ class CronDeliveryService:
             outbound,
             title_source=title_source,
         )
-        await self._notify_best_effort(session, command.agent_id, outbound)
+        await self._notify_best_effort(
+            session, command.agent_id, outbound, kind=notice_kind
+        )
 
     async def _deliver_script(
         self,
@@ -208,7 +218,9 @@ class CronDeliveryService:
             locale,
             name=command.cron_name,
         )
-        await self._publish_fixed(command, session, outbound)
+        await self._publish_fixed(
+            command, session, outbound, notice_kind="task_completed"
+        )
 
     def _backend_spec(self, agent_id: str) -> Any:
         row = self._agent_manager.get_row(agent_id)
@@ -302,7 +314,12 @@ class CronDeliveryService:
             outbound,
             title_source=command.prompt,
         )
-        await self._notify_best_effort(session, command.agent_id, outbound)
+        await self._notify_best_effort(
+            session,
+            command.agent_id,
+            outbound,
+            kind="task_completed",
+        )
 
     async def _build_agent_request(
         self,
@@ -467,15 +484,67 @@ class CronDeliveryService:
         session: SessionRow,
         agent_id: str,
         text: str,
+        *,
+        kind: str = "proactive_push",
     ) -> None:
         if session.channel_type != ThreadRegistry.CHANNEL_DASHBOARD:
             return
         try:
-            await self._gateway.notify_dashboard_push(session, agent_id, text)
+            if kind == "proactive_push":
+                await self._gateway.notify_dashboard_push(session, agent_id, text)
+            else:
+                try:
+                    await self._gateway.notify_dashboard_push(
+                        session,
+                        agent_id,
+                        text,
+                        kind=kind,  # type: ignore[arg-type]
+                    )
+                except TypeError:
+                    await self._gateway.notify_dashboard_push(session, agent_id, text)
         except Exception:
             logger.warning(
                 "failed to send cron dashboard notification for thread=%s",
                 session.thread_id,
+                exc_info=True,
+            )
+
+    async def _notify_failure_best_effort(
+        self,
+        session: SessionRow | None,
+        session_key: str,
+        command: CronDeliveryCommand,
+        exc: BaseException,
+    ) -> None:
+        if session is not None:
+            if session.channel_type != ThreadRegistry.CHANNEL_DASHBOARD:
+                return
+            if session.user_id != command.user_id:
+                return
+            thread_id = session.thread_id
+        else:
+            if f":{ThreadRegistry.CHANNEL_DASHBOARD}:" not in session_key:
+                return
+            thread_id = pinned_thread_id(command.session_key) or ""
+        notify = getattr(self._gateway, "notify_dashboard_event", None)
+        if not callable(notify):
+            return
+        prefix = f"{command.cron_name}: " if command.cron_name else ""
+        detail = f"{prefix}{exc}".strip()
+        try:
+            maybe = notify(
+                user_id=command.user_id,
+                agent_id=command.agent_id,
+                thread_id=thread_id,
+                kind="task_failed",
+                text=detail,
+            )
+            if inspect.isawaitable(maybe):
+                await maybe
+        except Exception:
+            logger.warning(
+                "failed to send cron failure notification for session=%s",
+                session_key,
                 exc_info=True,
             )
 

@@ -345,6 +345,7 @@ Preload 仅暴露最小类型化桥梁 `window.octopDesktop`：
 - `onBackendReady(callback)`：接收后端服务就绪事件。
 - `setWindowChrome(theme)`：把页面主题（含「跟随系统」偏好）同步给 `nativeTheme`，让系统原生窗口按钮配色一致。没有最小化 / 最大化 / 关闭接口——窗口按钮完全原生，页面不参与。
 - `onWindowFullscreenChange(callback)`：进入 / 退出全屏时通知页面（macOS 全屏会隐藏交通灯，页面据此收回为它们预留的条带）。
+- `showMessageNotice({ title, body, path, tag? }) -> Promise<boolean>`：由页面端 `DesktopNotificationAdapter` 在需要提醒时调用（如等待人工确认、任务完成、任务失败、主动推送），弹出桌面原生系统通知并返回是否成功展示。`path` 仅接受 `/chat/<agent>` 或 `/chat/<agent>/<thread>`。点击通知会把窗口带到前台，并通过 `onMessageNoticeOpen(callback)` 把同一条路径交回页面。
 - `clientSettings`：供 Web 设置页读写新增的客户端项（开机启动、关闭行为、主题背景、是否只跟随稳定版）。不能写 `config.json`，也不能指定更新检测地址或安装包地址。
 - `installUpdate()`：页面确认后开始安装。不接受参数，渲染进程不能指定包地址。检查失败和安装失败仍由主进程的系统框提示。
 - `wsEndpoint()`：返回 WebSocket 中继的地址（§5.2）。同步返回，因为 URL 拼装发生在渲染路径里没法 await；没有中继时返回 `null`，页面就回退到"从自身 origin 推导"。

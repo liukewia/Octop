@@ -120,6 +120,18 @@ export interface OctopDesktopBridge {
   checkForUpdates(): Promise<DesktopUpdateCheckResult>;
   /** Start the shell install. Takes no arguments; the page confirms first. */
   installUpdate(): Promise<void>;
+  /**
+   * Native OS notification for an agent event. Absent on a shell from before
+   * this handshake; resolves `true` when the OS notification was shown.
+   */
+  showMessageNotice?(notice: {
+    title: string;
+    body: string;
+    path: string;
+    tag?: string;
+  }): Promise<boolean> | boolean | void;
+  /** The user clicked that popup. `path` is an in-app chat path. */
+  onMessageNoticeOpen?(callback: (path: string) => void): () => void;
 }
 
 declare global {

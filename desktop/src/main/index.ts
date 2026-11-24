@@ -6,6 +6,7 @@ import {
   Menu,
   nativeImage,
   net,
+  Notification,
   protocol,
   screen,
   shell,
@@ -80,6 +81,7 @@ import {
 } from "./windows/app-menu";
 import { createEarlyWindow } from "./windows/early-window";
 import { createMainWindow, installDashboardGuards } from "./windows/main-window";
+import { parseMessageNotice, showMessageNotice } from "./windows/message-notice";
 import type { EarlyWindow } from "./windows/early-window";
 import { isWindowOnScreen, presentWindows, shouldKeepWindowOnClose } from "./windows/present";
 import {
@@ -522,6 +524,29 @@ function registerIpcHandlers(): void {
   // themselves are native and never cross this bridge. The preference is also
   // the device setting the next Early Window paints from — the splash cannot
   // read the Dashboard's localStorage.
+  ipcMain.handle(IPC_CHANNELS.showMessageNotice, (event, raw: unknown): boolean => {
+    const notice = parseMessageNotice(raw);
+    if (!notice) return false;
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win || win.isDestroyed()) return false;
+    return showMessageNotice(
+      notice,
+      {
+        isSupported: () => Notification.isSupported(),
+        create: (options) => new Notification(options),
+      },
+      () => {
+        if (win.isDestroyed()) return;
+        presentWindows([win]);
+        raiseHiddenWindows([win]);
+        app.focus({ steal: true });
+        if (!win.webContents.isDestroyed()) {
+          win.webContents.send(IPC_CHANNELS.messageNoticeOpen, notice.path);
+        }
+      },
+    );
+  });
+
   ipcMain.on(IPC_CHANNELS.windowChromeTheme, (event, theme: unknown) => {
     const parsed = parseWindowChromeTheme(theme);
     if (!parsed) return;

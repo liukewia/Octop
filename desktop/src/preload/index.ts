@@ -3,6 +3,7 @@ import {
   IPC_CHANNELS,
   type ClientSettings,
   type IssuedSession,
+  type MessageNoticeRequest,
   type PlatformInfo,
   type UpdateCheckResult,
   type WindowChromeTheme,
@@ -129,6 +130,17 @@ const bridge = {
     revoke(accessToken: string): Promise<boolean> {
       return ipcRenderer.invoke(IPC_CHANNELS.sessionRevoke, accessToken);
     },
+  },
+  /**
+   * Native OS notification for an agent event (`hitl_required`, `task_completed`,
+   * `task_failed`, `proactive_push`). Resolves `true` when the OS notification
+   * sink displayed the popup, or `false` so the renderer can fall back.
+   */
+  showMessageNotice(notice: MessageNoticeRequest): Promise<boolean> {
+    return ipcRenderer.invoke(IPC_CHANNELS.showMessageNotice, notice);
+  },
+  onMessageNoticeOpen(callback: (path: string) => void): () => void {
+    return subscribe(IPC_CHANNELS.messageNoticeOpen, callback);
   },
 } as const;
 

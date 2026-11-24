@@ -2,7 +2,7 @@ import { App } from "antd";
 import { Bell } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { buildDashboardNotifyWsUrl } from "../api/modules/wsNotifications";
 import { getAuthToken } from "../api/request";
 import { useAgent, type OctopAgent } from "../context/AgentContext";
@@ -19,17 +19,23 @@ import {
   emitSessionEvent,
   invalidateHistory,
 } from "../pages/Chat/hooks/chatStore";
+import { getDesktopBridge } from "../utils/desktopBridge";
 import {
-  claimSystemPush,
+  buildAgentNoticePath,
+  formatAgentNoticeCopy,
+  isDashboardPushPath,
+  isViewingTargetThread,
   markPushHandled,
   parseDashboardPushFrame,
   pushDedupeKey,
-  readSystemNotifyPermission,
-  resolvePushDelivery,
+  shouldSuppressAgentNotification,
   systemNotificationTag,
-  truncatePushText,
-  type DashboardPushEvent,
 } from "../utils/dashboardPushToast";
+import {
+  createNotificationAdapter,
+  type AgentNoticePayload,
+  type UiPermissionExtra,
+} from "../utils/notification";
 import { peekSystemNotifyRegistration } from "../sw-register";
 import { publicUrl } from "../utils/publicUrl";
 import styles from "./useDashboardPushToast.module.less";
@@ -53,20 +59,13 @@ function notificationIcon(): string {
   return new URL(publicUrl("pwa-192.png"), window.location.href).href;
 }
 
-function pushChatPath(parsed: DashboardPushEvent): string {
-  return `/chat/${parsed.agent_id}/${parsed.thread_id}`;
-}
-
-function systemNotifyOptions(
-  parsed: DashboardPushEvent,
-): NotificationOptions & { renotify?: boolean } {
-  return {
-    body: truncatePushText(parsed.text),
-    tag: systemNotificationTag(parsed.thread_id),
-    icon: notificationIcon(),
-    renotify: true,
-    data: { path: pushChatPath(parsed) },
-  };
+function accentForPayload(
+  payload: AgentNoticePayload,
+  agent?: OctopAgent,
+): string {
+  if (payload.kind === "task_failed") return "#ef4444";
+  if (payload.kind === "hitl_required") return "#f59e0b";
+  return agent?.color?.trim() || "#6366f1";
 }
 
 function PushToastIcon({ agent }: { agent?: OctopAgent }) {
@@ -91,10 +90,15 @@ function PushToastIcon({ agent }: { agent?: OctopAgent }) {
   );
 }
 
-/** Listen for dashboard text pushes and show a bottom-right toast. */
+/**
+ * Subscribe to `/api/notifications/ws`, apply agent notification timing and
+ * focus-suppression rules, and dispatch through the active carrier adapter
+ * (Browser Notification / UI fallback vs. Desktop OS Notification).
+ */
 export function useDashboardPushToast(): void {
   const { notification } = App.useApp();
   const navigate = useNavigate();
+  const location = useLocation();
   const { t } = useTranslation();
   const { refresh, agents } = useAgent();
   const agentsRef = useRef(agents);
@@ -103,6 +107,8 @@ export function useDashboardPushToast(): void {
   notificationRef.current = notification;
   const navigateRef = useRef(navigate);
   navigateRef.current = navigate;
+  const pathnameRef = useRef(location.pathname);
+  pathnameRef.current = location.pathname;
   const tRef = useRef(t);
   tRef.current = t;
   const refreshRef = useRef(refresh);
@@ -111,47 +117,19 @@ export function useDashboardPushToast(): void {
   useEffect(() => {
     const tabId = Math.random().toString(36).slice(2);
     let ws: WebSocket | null = null;
-
-    const onNotifyOpen = (event: MessageEvent) => {
-      const data = event.data as { type?: string; path?: string } | null;
-      if (!data || data.type !== "octop-notify-open" || !data.path) return;
-      window.focus();
-      navigateRef.current(data.path);
-    };
-    navigator.serviceWorker?.addEventListener("message", onNotifyOpen);
     let closed = false;
     let retry = 0;
     let reconnectTimer: number | null = null;
 
-    const clearReconnect = () => {
-      if (reconnectTimer !== null) {
-        window.clearTimeout(reconnectTimer);
-        reconnectTimer = null;
-      }
-    };
-
-    const scheduleReconnect = () => {
-      if (closed) return;
-      clearReconnect();
-      const delay = Math.min(1000 * 2 ** retry, MAX_RETRY_MS);
-      retry += 1;
-      reconnectTimer = window.setTimeout(connect, delay);
-    };
-
-    const pushTitle = (parsed: DashboardPushEvent) =>
-      parsed.agent_name
-        ? tRef.current("chat.pushToast.title", { name: parsed.agent_name })
-        : tRef.current("chat.pushToast.titleFallback");
-
-    const openToast = (
-      parsed: DashboardPushEvent,
-      extra: "enable" | "enabled" | "denied" | "none",
-      noticeKey = `dash-push-${parsed.thread_id}-${Date.now()}`,
+    const openUiToast = (
+      payload: AgentNoticePayload,
+      extra: UiPermissionExtra,
+      noticeKey = payload.tag,
     ) => {
       const agent = agentsRef.current.find(
-        (item) => item.agent_id === parsed.agent_id,
+        (item) => item.agent_id === payload.agentId,
       );
-      const accent = agent?.color?.trim() || "#6366f1";
+      const accent = accentForPayload(payload, agent);
       notificationRef.current.open({
         key: noticeKey,
         placement: "bottomRight",
@@ -162,12 +140,12 @@ export function useDashboardPushToast(): void {
         message: (
           <span className={styles.header}>
             <PushToastIcon agent={agent} />
-            <span className={styles.title}>{pushTitle(parsed)}</span>
+            <span className={styles.title}>{payload.title}</span>
           </span>
         ),
         description: (
           <>
-            <span className={styles.body}>{truncatePushText(parsed.text)}</span>
+            <span className={styles.body}>{payload.body}</span>
             {extra === "enable" ? (
               <button
                 type="button"
@@ -178,14 +156,14 @@ export function useDashboardPushToast(): void {
                   if (typeof Notification === "undefined") return;
                   void Notification.requestPermission().then((result) => {
                     if (result === "granted") {
-                      openToast(parsed, "enabled", noticeKey);
+                      openUiToast(payload, "enabled", noticeKey);
                     } else if (result === "denied") {
-                      openToast(parsed, "denied", noticeKey);
+                      openUiToast(payload, "denied", noticeKey);
                     }
                   });
                 }}
               >
-                {tRef.current("chat.pushToast.enableBackground")}
+                {tRef.current("chat.pushToast.enablePermission")}
               </button>
             ) : null}
             {extra === "enabled" ? (
@@ -206,53 +184,49 @@ export function useDashboardPushToast(): void {
             ) : null}
           </>
         ),
-        duration: null,
+        duration: payload.kind === "hitl_required" ? null : 8,
         closable: true,
         onClick: () => {
           notificationRef.current.destroy(noticeKey);
-          navigateRef.current(`/chat/${parsed.agent_id}/${parsed.thread_id}`);
+          if (isDashboardPushPath(payload.path)) {
+            navigateRef.current(payload.path);
+          }
         },
       });
     };
 
-    const openConstructor = (parsed: DashboardPushEvent) => {
-      if (typeof Notification === "undefined") return;
-      try {
-        const notice = new Notification(
-          pushTitle(parsed),
-          systemNotifyOptions(parsed),
-        );
-        notice.onclick = () => {
-          window.focus();
-          notice.close();
-          navigateRef.current(pushChatPath(parsed));
-        };
-      } catch {
-        // The in-page toast is already on screen.
+    const adapter = createNotificationAdapter({
+      desktopBridge: getDesktopBridge(),
+      tabId,
+      openUiToast: (payload, extra) => openUiToast(payload, extra),
+      onNavigate: (path) => {
+        if (isDashboardPushPath(path)) {
+          navigateRef.current(path);
+        }
+      },
+      getStorage: browserStorage,
+      getIconUrl: notificationIcon,
+      peekServiceWorkerRegistration: peekSystemNotifyRegistration,
+    });
+
+    const unsubscribeOpen = adapter.subscribeOpen((path) => {
+      if (!isDashboardPushPath(path)) return;
+      navigateRef.current(path);
+    });
+
+    const clearReconnect = () => {
+      if (reconnectTimer !== null) {
+        window.clearTimeout(reconnectTimer);
+        reconnectTimer = null;
       }
     };
 
-    const openSystem = (parsed: DashboardPushEvent) => {
-      const title = pushTitle(parsed);
-      const options = systemNotifyOptions(parsed);
-      // Chrome drops `new Notification()` while this tab is in the background.
-      // showNotification() on the worker registration is the one it still displays.
-      const ready = peekSystemNotifyRegistration();
-      if (ready) {
-        void ready.showNotification(title, options).catch(() => {
-          openConstructor(parsed);
-        });
-        return;
-      }
-      if ("serviceWorker" in navigator) {
-        void navigator.serviceWorker.ready
-          .then((registration) => registration.showNotification(title, options))
-          .catch(() => {
-            openConstructor(parsed);
-          });
-        return;
-      }
-      openConstructor(parsed);
+    const scheduleReconnect = () => {
+      if (closed) return;
+      clearReconnect();
+      const delay = Math.min(1000 * 2 ** retry, MAX_RETRY_MS);
+      retry += 1;
+      reconnectTimer = window.setTimeout(connect, delay);
     };
 
     const rememberHandled = (key: string) => {
@@ -304,36 +278,68 @@ export function useDashboardPushToast(): void {
         const parsed = parseDashboardPushFrame(raw);
         if (!parsed) return;
         void refreshRef.current({ silent: true });
-        // A proactive run wrote to this thread outside the chat socket. Stale it
-        // here (not in the chat page listener) so the cached page is dropped
-        // even when the push lands while another route is open.
-        invalidateHistory(parsed.thread_id);
-        // Refresh the sidebar and the open thread's history without a reload.
-        emitSessionEvent({
-          kind: "sessionsChanged",
-          sessionId: parsed.thread_id,
-          agentId: parsed.agent_id,
-        });
-        const permission = readSystemNotifyPermission(
-          window.isSecureContext,
-          typeof Notification === "undefined" ? undefined : Notification,
+
+        const currentPathname = pathnameRef.current;
+        const viewingSameThread = isViewingTargetThread(
+          currentPathname,
+          parsed.agent_id,
+          parsed.thread_id,
         );
-        const delivery = resolvePushDelivery({
-          permission,
-          visible: document.visibilityState === "visible",
-        });
+
+        // Refresh cached history & sidebar when the write happened outside the
+        // currently mounted chat stream (e.g. background cron, or another thread).
+        // Skip `hitl_required` and live open-thread turns so we do not trigger a
+        // redundant history reload over an active stream or approval card.
+        if (
+          parsed.thread_id &&
+          parsed.kind !== "hitl_required" &&
+          (parsed.kind === "proactive_push" || !viewingSameThread)
+        ) {
+          invalidateHistory(parsed.thread_id);
+          emitSessionEvent({
+            kind: "sessionsChanged",
+            sessionId: parsed.thread_id,
+            agentId: parsed.agent_id,
+          });
+        }
+
         const dedupeKey = pushDedupeKey(parsed);
-        // The card stays either way, so coming back still has something to open.
-        openToast(parsed, delivery.offerEnable ? "enable" : "none");
-        if (document.visibilityState === "visible") {
+        const visible = document.visibilityState === "visible";
+        const focused = document.hasFocus();
+        if (
+          shouldSuppressAgentNotification({
+            visible,
+            focused,
+            pathname: currentPathname,
+            agentId: parsed.agent_id,
+            threadId: parsed.thread_id,
+          })
+        ) {
           rememberHandled(dedupeKey);
           return;
         }
-        if (!delivery.system) return;
-        // Raise the OS notification in this turn. A timer would be deferred
-        // until the background tab is focused, and by then we would skip it.
-        if (!claimSystemPush(browserStorage(), dedupeKey, tabId)) return;
-        openSystem(parsed);
+
+        const path = buildAgentNoticePath(parsed);
+        if (!isDashboardPushPath(path)) return;
+        const { title, body } = formatAgentNoticeCopy(parsed, (key, opts) =>
+          tRef.current(key, opts),
+        );
+        const tag = systemNotificationTag(
+          parsed.thread_id || parsed.agent_id,
+          parsed.kind,
+        );
+        void adapter.notify({
+          kind: parsed.kind,
+          hitlSubtype: parsed.hitl_subtype,
+          agentId: parsed.agent_id,
+          threadId: parsed.thread_id,
+          agentName: parsed.agent_name,
+          title,
+          body,
+          path,
+          tag,
+          dedupeKey,
+        });
       };
       socket.onclose = () => {
         if (ws !== socket) return;
@@ -355,7 +361,7 @@ export function useDashboardPushToast(): void {
 
     return () => {
       closed = true;
-      navigator.serviceWorker?.removeEventListener("message", onNotifyOpen);
+      unsubscribeOpen();
       clearReconnect();
       window.clearInterval(pingTimer);
       if (ws) {

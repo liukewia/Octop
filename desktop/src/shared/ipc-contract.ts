@@ -79,4 +79,16 @@ export const IPC_CHANNELS = {
   sessionRegister: "octop:session:register",
   sessionRenew: "octop:session:renew",
   sessionRevoke: "octop:session:revoke",
+  /** Renderer → main. Show a native popup for one dashboard text push. */
+  showMessageNotice: "octop:message-notice:show",
+  /** Main → renderer. The user clicked that popup; payload is the chat path. */
+  messageNoticeOpen: "octop:message-notice:open",
 } as const;
+
+/** Payload for {@link IPC_CHANNELS.showMessageNotice}. */
+export interface MessageNoticeRequest {
+  title: string;
+  body: string;
+  path: string;
+  tag?: string;
+}

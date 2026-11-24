@@ -761,6 +761,11 @@ class SteerCoordinator:
             if state is not None:
                 state.phase = "cancelling"
 
+    def is_cancelling(self, thread_id: str) -> bool:
+        with self._lock:
+            state = self._by_thread.get(thread_id.strip())
+            return state is not None and state.phase == "cancelling"
+
     def _discard_locked(self, state: TurnSteerState, *, reason: DiscardReason) -> DiscardBundle:
         items = list(state.queue)
         state.queue.clear()

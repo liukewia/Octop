@@ -1544,6 +1544,18 @@
     "pushToast": {
       "title": "{{name}} sent a reminder",
       "titleFallback": "Task reminder",
+      "hitlApprovalTitle": "{{name}} is waiting for your approval",
+      "hitlApprovalTitleFallback": "Tool approval needed",
+      "hitlAskTitle": "{{name}} is waiting for your reply",
+      "hitlAskTitleFallback": "Reply needed",
+      "hitlBodyFallback": "Confirmation needed to continue",
+      "completedTitle": "{{name}} completed the task",
+      "completedTitleFallback": "Task completed",
+      "completedBodyFallback": "Click to view the reply",
+      "failedTitle": "{{name}} task failed",
+      "failedTitleFallback": "Task failed",
+      "failedBodyFallback": "An error occurred. Click for details.",
+      "enablePermission": "Enable browser notifications",
       "enableBackground": "Also notify me in the background",
       "enabled": "On. Reminders use system notifications when this tab is in the background.",
       "denied": "Notifications are blocked. Allow them from the site settings in the address bar."

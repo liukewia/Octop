@@ -343,6 +343,8 @@ async def _bridge_chat_ws(
     host_turn_task: asyncio.Task[None] | None = None
     host_turn_ended = False
     last_thread_id = ""
+    cancelled_threads: set[str] = set()
+    gateway = getattr(rt, "gateway", None) if rt is not None else None
 
     async def stop_listen() -> None:
         nonlocal listen_task
@@ -397,17 +399,96 @@ async def _bridge_chat_ws(
 
     async def run_turn(turn_payload: dict[str, Any], *, is_host: bool) -> None:
         nonlocal last_thread_id, host_turn_ended
+        from octop.infra.gateway.notifications import summarize_hitl_notice  # noqa: PLC0415
+        from octop.infra.utils.locale import resolve_user_locale  # noqa: PLC0415
+
         resolved_thread_id = str(turn_payload.get("thread_id") or "").strip()
+        if is_host and resolved_thread_id:
+            cancelled_threads.discard(resolved_thread_id)
+        reply_parts: list[str] = []
+        paused_hitl = False
+        error_text = ""
+        notified_outcome = False
+        user_locale = resolve_user_locale(
+            user_repo=getattr(getattr(server, "services", None), "user_repo", None),
+            user_id=user.id,
+            channel_type="dashboard",
+        )
+
+        async def notify_bridge(
+            notice_kind: Any,
+            notice_text: str,
+            *,
+            event_id: str | None = None,
+            hitl_subtype: Any = None,
+        ) -> None:
+            tid = resolved_thread_id or last_thread_id
+            if gateway is None or not tid:
+                return
+            await gateway.notify_dashboard_event(
+                user_id=user.id,
+                agent_id=ref.agent_id,
+                thread_id=tid,
+                kind=notice_kind,
+                text=notice_text,
+                event_id=event_id,
+                hitl_subtype=hitl_subtype,
+                agent_name_override=ref.remote_agent_id,
+            )
 
         async def capture(frame: dict[str, Any]) -> None:
-            nonlocal resolved_thread_id, host_turn_ended
+            nonlocal resolved_thread_id, host_turn_ended, paused_hitl, error_text, notified_outcome
             kind = str(frame.get("type") or "")
             if kind == "thread":
                 tid = str(frame.get("thread_id") or "").strip()
                 if tid:
                     resolved_thread_id = tid
-            if is_host and kind == "turn.ended":
-                host_turn_ended = True
+            if is_host:
+                if kind in ("token", "delta"):
+                    piece = frame.get("content") or frame.get("text")
+                    if isinstance(piece, str) and piece:
+                        reply_parts.append(piece)
+                elif kind == "error":
+                    error_text = str(frame.get("message") or "")
+                elif kind == "hitl_required":
+                    paused_hitl = True
+                    req = frame.get("request")
+                    pending_id = str(
+                        frame.get("pending_id")
+                        or (req.get("pending_id") if isinstance(req, dict) else "")
+                        or ""
+                    )
+                    subtype, summary = summarize_hitl_notice(
+                        req if isinstance(req, dict) else None,
+                        locale=user_locale,
+                    )
+                    await notify_bridge(
+                        "hitl_required",
+                        summary,
+                        event_id=f"hitl:{pending_id or resolved_thread_id or last_thread_id}",
+                        hitl_subtype=subtype,
+                    )
+                elif kind == "turn.ended":
+                    host_turn_ended = True
+                    tid = resolved_thread_id or last_thread_id
+                    was_cancelled = bool(tid and tid in cancelled_threads)
+                    if tid:
+                        cancelled_threads.discard(tid)
+                    turn_id = str(frame.get("turn_id") or "")
+                    if not notified_outcome and not paused_hitl and not was_cancelled:
+                        notified_outcome = True
+                        if error_text:
+                            await notify_bridge(
+                                "task_failed",
+                                error_text,
+                                event_id=f"turn-fail:{turn_id}" if turn_id else None,
+                            )
+                        else:
+                            await notify_bridge(
+                                "task_completed",
+                                "".join(reply_parts),
+                                event_id=f"turn-done:{turn_id}" if turn_id else None,
+                            )
             # Keep forwarding after host ``turn.ended``. Member tokens use
             # this same subscriber; handing the room to a second listen
             # drops them.
@@ -424,17 +505,33 @@ async def _bridge_chat_ws(
         except asyncio.CancelledError:
             raise
         except OctopError as exc:
+            if is_host and not notified_outcome:
+                notified_outcome = True
+                await notify_bridge("task_failed", str(exc))
             await send_frame({"type": "error", "message": str(exc)})
             await send_frame({"type": "done"})
         except Exception:
             logger.exception("bridge chat relay failed")
+            if is_host and not notified_outcome:
+                notified_outcome = True
+                await notify_bridge("task_failed", "bridge turn failed")
             await send_frame({"type": "error", "message": "bridge turn failed"})
             await send_frame({"type": "done"})
         else:
             # Peer closed the turn (older peer). Re-attach so a late member
             # flush still has a room socket.
             if is_host:
-                ensure_listen(resolved_thread_id or last_thread_id)
+                tid = resolved_thread_id or last_thread_id
+                was_cancelled = bool(tid and tid in cancelled_threads)
+                if tid:
+                    cancelled_threads.discard(tid)
+                if not notified_outcome and not paused_hitl and not was_cancelled:
+                    notified_outcome = True
+                    if error_text:
+                        await notify_bridge("task_failed", error_text)
+                    else:
+                        await notify_bridge("task_completed", "".join(reply_parts))
+                ensure_listen(tid)
         finally:
             if resolved_thread_id:
                 last_thread_id = resolved_thread_id
@@ -491,6 +588,7 @@ async def _bridge_chat_ws(
                 if not thread_id:
                     await send_frame({"type": "error", "message": "cancel requires thread_id"})
                     continue
+                cancelled_threads.add(thread_id)
                 try:
                     await mgr.relay_turn_cancel(
                         connection_id=ref.connection_id,

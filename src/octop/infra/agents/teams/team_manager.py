@@ -358,6 +358,14 @@ class TeamManager:
             text = format_stream_error(text, self._locale_for(_octop_user_id(event.user_id)))
         if room:
             await self._push_room_to_channels(room, speaker, text, wrapup=True)
+        if room and event.status != "cancelled":
+            await self._notify_room_dashboard_event(
+                room,
+                speaker_id=speaker,
+                kind="task_failed" if event.status != "done" else "task_completed",
+                text=text,
+                event_id=f"team-reply:{event.inbox_id}" if event.inbox_id else None,
+            )
         live_ws = self._take_live_host_reply(room) and event.status == "done"
         if live_ws:
             if room:
@@ -1739,10 +1747,73 @@ class TeamManager:
         self._hitl_waiters[record.pending_id] = loop.create_future()
         request = dict(request)
         request["pending_id"] = record.pending_id
+        if channel == "dashboard":
+            from octop.infra.gateway.notifications import summarize_hitl_notice  # noqa: PLC0415
+
+            subtype, summary = summarize_hitl_notice(
+                request,
+                locale=self._locale_for(user_id),
+            )
+            await self._notify_room_dashboard_event(
+                room_thread_id,
+                speaker_id=speaker_id,
+                kind="hitl_required",
+                text=summary,
+                event_id=f"hitl:{record.pending_id}",
+                hitl_subtype=subtype,
+                host_id_override=host_id,
+                user_id_override=user_id,
+            )
         return (
             {**chunk, "request": request, "pending_id": record.pending_id},
             record.pending_id,
         )
+
+    async def _notify_room_dashboard_event(
+        self,
+        room_thread_id: str,
+        *,
+        speaker_id: str,
+        kind: Any,
+        text: str,
+        event_id: str | None = None,
+        hitl_subtype: Any = None,
+        host_id_override: str = "",
+        user_id_override: int = 0,
+    ) -> None:
+        notify = getattr(self._gateway, "notify_dashboard_event", None)
+        if not callable(notify) or not room_thread_id:
+            return
+        getter = getattr(self._thread_registry, "get_thread", None)
+        row = getter(room_thread_id) if callable(getter) else None
+        if row is not None:
+            channel = str(getattr(row, "channel_type", "") or "") or "dashboard"
+            if channel != "dashboard":
+                return
+        host_id = host_id_override or str(getattr(row, "agent_id", "") or "")
+        user_id = user_id_override or int(getattr(row, "user_id", 0) or 0)
+        if not host_id or user_id <= 0:
+            return
+        try:
+            maybe = notify(
+                user_id=user_id,
+                agent_id=host_id,
+                thread_id=room_thread_id,
+                kind=kind,
+                text=text,
+                event_id=event_id,
+                hitl_subtype=hitl_subtype,
+                agent_name_override=self._display_name(speaker_id) if speaker_id else None,
+            )
+            if inspect.isawaitable(maybe):
+                await maybe
+        except Exception:
+            logger.warning(
+                "failed to send team dashboard notification room=%s kind=%s",
+                room_thread_id,
+                kind,
+                exc_info=True,
+            )
 
     async def _wait_member_hitl(self, pending_id: str) -> list[dict[str, Any]]:
         fut = self._hitl_waiters.get(pending_id)
