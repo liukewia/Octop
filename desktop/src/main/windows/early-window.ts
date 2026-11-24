@@ -91,6 +91,7 @@ export function createEarlyWindow(options: EarlyWindowOptions): EarlyWindow {
      * channel the shell and its own page share for structured data.
      */
     showError(failure: ShellFailure): void {
+      if (win.isDestroyed()) return;
       const payload = encodeShellError({ ...failure, version: options.version });
       // Dismissing the failure page ends the launch: on macOS the app would
       // otherwise idle in the Dock with no window and nothing left to show.
@@ -114,6 +115,11 @@ export function createEarlyWindow(options: EarlyWindowOptions): EarlyWindow {
 }
 
 let relaunchHandlerRegistered = false;
+let beforeRelaunchHook: (() => Promise<void>) | null = null;
+
+export function setBeforeRelaunchHook(hook: () => Promise<void>): void {
+  beforeRelaunchHook = hook;
+}
 
 /**
  * "重试" on the failure page. Most boot failures are transient (a busy port, a
@@ -125,8 +131,16 @@ let relaunchHandlerRegistered = false;
 function registerRelaunchHandler(): void {
   if (relaunchHandlerRegistered) return;
   relaunchHandlerRegistered = true;
-  ipcMain.on(EARLY_IPC.restart, () => {
-    app.relaunch();
-    app.exit(0);
+  ipcMain.on(EARLY_IPC.restart, (event) => {
+    const senderUrl = event.sender.getURL();
+    if (!senderUrl.startsWith("file://") || !senderUrl.includes("error.html")) {
+      return;
+    }
+    void (beforeRelaunchHook ? beforeRelaunchHook() : Promise.resolve())
+      .catch(() => undefined)
+      .finally(() => {
+        app.relaunch();
+        app.exit(0);
+      });
   });
 }

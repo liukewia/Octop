@@ -115,7 +115,12 @@ export class WsRelay {
 
   /** ``/<token>/api/<path>`` → ``/api/<path>``, or null when it is not ours. */
   private route(rawUrl: string | undefined): { path: string; search: string } | null {
-    const url = new URL(rawUrl ?? "/", "http://127.0.0.1");
+    let url: URL;
+    try {
+      url = new URL(rawUrl ?? "/", "http://127.0.0.1");
+    } catch {
+      return null;
+    }
     const segments = url.pathname.split("/");
     const presented = segments[1] ?? "";
     if (!sameSecret(presented, this.token)) return null;

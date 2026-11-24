@@ -51,11 +51,25 @@ async def write_config(
     _: Any = Depends(require_admin()),
     server: Any = Depends(get_server),
 ) -> dict[str, Any]:
-    if body.enabled and (not body.base_url.strip() or not body.client_id.strip()):
-        raise OctopError(
-            ErrorCode.CLOUD_ACCOUNT_BAD_REQUEST,
-            "service URL and client id are required to enable cloud sign-in",
+    if body.enabled:
+        if not body.base_url.strip() or not body.client_id.strip():
+            msg = "service URL and client id are required to enable cloud sign-in"
+            raise OctopError(
+                ErrorCode.CLOUD_ACCOUNT_BAD_REQUEST,
+                msg,
+                details={"detail": msg},
+            )
+        existing = server.cloud_account_service.config()
+        has_secret = bool(body.client_secret and body.client_secret.strip()) or bool(
+            existing and existing.client_secret
         )
+        if not has_secret:
+            msg = "client secret is required to enable cloud sign-in"
+            raise OctopError(
+                ErrorCode.CLOUD_ACCOUNT_BAD_REQUEST,
+                msg,
+                details={"detail": msg},
+            )
     try:
         save_config(
             server.services,
@@ -72,7 +86,11 @@ async def write_config(
             signup_url=body.signup_url,
         )
     except CloudConfigError as exc:
-        raise OctopError(ErrorCode.CLOUD_ACCOUNT_BAD_REQUEST, str(exc)) from exc
+        raise OctopError(
+            ErrorCode.CLOUD_ACCOUNT_BAD_REQUEST,
+            str(exc),
+            details={"detail": str(exc)},
+        ) from exc
     return cast(dict[str, Any], server.cloud_account_service.admin_view())
 
 

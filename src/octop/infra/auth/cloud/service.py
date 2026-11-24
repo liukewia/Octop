@@ -13,8 +13,10 @@ Local accounts never pass through here.
 
 from __future__ import annotations
 
+import asyncio
 import secrets
 import time
+import weakref
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -61,6 +63,16 @@ class CloudAccountService:
             window_seconds=60,
             block_seconds=services.config.login_lockout_seconds,
         )
+        self._session_locks: weakref.WeakValueDictionary[str, asyncio.Lock] = (
+            weakref.WeakValueDictionary()
+        )
+
+    def _session_lock(self, session_id: str) -> asyncio.Lock:
+        lock = self._session_locks.get(session_id)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._session_locks[session_id] = lock
+        return lock
 
     # ----- configuration -------------------------------------------------
 
@@ -194,38 +206,58 @@ class CloudAccountService:
         secret = self._services.secret_repo.get("jwt")
         if secret is None:
             raise OctopError(ErrorCode.INTERNAL_ERROR, "jwt secret missing")
-        from octop.infra.auth.tokens import InvalidToken, decode_token, token_cloud_session
+        from octop.infra.auth.tokens import (
+            PURPOSE_ACCESS,
+            InvalidToken,
+            decode_token,
+            token_cloud_session,
+            token_purpose,
+        )
 
         try:
             payload = decode_token(secret, access_token, verify_expiry=False)
+            if token_purpose(payload) != PURPOSE_ACCESS:
+                raise InvalidToken("wrong token purpose")
             session_id = token_cloud_session(payload)
-        except InvalidToken as exc:
+            token_uid = int(payload.get("sub") or 0)
+        except (InvalidToken, TypeError, ValueError) as exc:
             raise OctopError(ErrorCode.AUTH_FAILED, "invalid token") from exc
-        if session_id is None:
+        if session_id is None or token_uid <= 0:
             raise OctopError(ErrorCode.AUTH_FAILED, "not a cloud session")
-        session = self._services.cloud_session_repo.get(session_id)
-        if session is None or not session.is_active():
-            raise OctopError(
-                ErrorCode.CLOUD_ACCOUNT_SESSION_REVOKED, "cloud session is no longer valid"
-            )
-        if not session.refresh_token_enc:
-            raise OctopError(ErrorCode.AUTH_FAILED, "cloud session cannot be refreshed")
-        try:
-            refresh_token = decrypt_secret(self._services.secret_repo, session.refresh_token_enc)
-        except Exception as exc:
-            raise OctopError(ErrorCode.AUTH_FAILED, "cloud session cannot be refreshed") from exc
 
-        client = self._client_factory(cfg)
-        try:
-            token = await client.refresh(refresh_token)
-        except CloudAuthError as exc:
-            if exc.reason in ("invalid_credentials", "invalid_client", "account_disabled"):
-                self._services.cloud_session_repo.revoke(session_id)
-            raise self._to_octop_error(exc) from exc
+        async with self._session_lock(session_id):
+            session = self._services.cloud_session_repo.get(session_id)
+            if session is None or not session.is_active() or session.user_id != token_uid:
+                raise OctopError(
+                    ErrorCode.CLOUD_ACCOUNT_SESSION_REVOKED, "cloud session is no longer valid"
+                )
+            if not session.refresh_token_enc:
+                raise OctopError(ErrorCode.AUTH_FAILED, "cloud session cannot be refreshed")
+            try:
+                refresh_token = decrypt_secret(self._services.secret_repo, session.refresh_token_enc)
+            except Exception as exc:
+                raise OctopError(ErrorCode.AUTH_FAILED, "cloud session cannot be refreshed") from exc
 
-        identity = await self._identity_from_token(client, token, fallback_username="")
-        user = await self._project(cfg, identity)
-        return self._rotate_session(cfg, user, token, session_id=session_id)
+            client = self._client_factory(cfg)
+            try:
+                token = await client.refresh(refresh_token)
+            except CloudAuthError as exc:
+                if exc.reason in ("invalid_credentials", "invalid_client", "account_disabled"):
+                    self._services.cloud_session_repo.revoke(session_id)
+                raise self._to_octop_error(exc) from exc
+
+            identity = await self._identity_from_token(client, token, fallback_username="")
+            user = await self._project(cfg, identity)
+            if user.id != session.user_id:
+                raise OctopError(
+                    ErrorCode.CLOUD_ACCOUNT_SESSION_REVOKED, "cloud session identity mismatch"
+                )
+            current = self._services.cloud_session_repo.get(session_id)
+            if current is None or not current.is_active():
+                raise OctopError(
+                    ErrorCode.CLOUD_ACCOUNT_SESSION_REVOKED, "cloud session is no longer valid"
+                )
+            return self._rotate_session(cfg, user, token, session_id=session_id)
 
     async def logout(self, session_id: str | None) -> None:
         if not session_id:
@@ -302,22 +334,29 @@ class CloudAccountService:
             if not session.refresh_token_enc:
                 continue
             try:
-                refresh_token = decrypt_secret(
-                    self._services.secret_repo, session.refresh_token_enc
-                )
-                token = await client.refresh(refresh_token)
-                identity = await self._identity_from_token(client, token, fallback_username="")
-                await self._project(cfg, identity)
-                self._services.cloud_session_repo.touch(
-                    session.session_id,
-                    refresh_token_enc=(
-                        encrypt_secret(self._services.secret_repo, token.refresh_token)
-                        if token.refresh_token
-                        else None
-                    ),
-                    cloud_expires_at=int(time.time()) + token.expires_in,
-                )
-                updated += 1
+                async with self._session_lock(session.session_id):
+                    fresh = self._services.cloud_session_repo.get(session.session_id)
+                    if fresh is None or not fresh.is_active() or not fresh.refresh_token_enc:
+                        continue
+                    refresh_token = decrypt_secret(
+                        self._services.secret_repo, fresh.refresh_token_enc
+                    )
+                    token = await client.refresh(refresh_token)
+                    identity = await self._identity_from_token(client, token, fallback_username="")
+                    await self._project(cfg, identity)
+                    now = int(time.time())
+                    self._services.cloud_session_repo.touch(
+                        session.session_id,
+                        refresh_token_enc=(
+                            encrypt_secret(self._services.secret_repo, token.refresh_token)
+                            if token.refresh_token
+                            else None
+                        ),
+                        cloud_expires_at=now + token.expires_in,
+                        grace_expires_at=self._grace_expires_at(cfg, token, now),
+                        update_last_seen=False,
+                    )
+                    updated += 1
             except CloudAuthError as exc:
                 failed += 1
                 if exc.reason in ("invalid_credentials", "account_disabled"):
@@ -359,7 +398,15 @@ class CloudAccountService:
             permissions=identity.permissions if cfg.sync_permissions else None,
             locale=identity.locale,
             allow_admin=cfg.allow_admin,
+            auto_provision=cfg.auto_provision,
         )
+
+    @staticmethod
+    def _grace_expires_at(cfg: CloudAccountConfig, token: CloudToken, now: int) -> int:
+        if cfg.offline_grace_seconds == 0:
+            # Online-only: the local session lives no longer than the cloud token.
+            return now + token.expires_in
+        return now + max(cfg.offline_grace_seconds, token.expires_in)
 
     def _start_session(
         self,
@@ -370,7 +417,7 @@ class CloudAccountService:
         device_label: str | None,
     ) -> IssuedCloudSession:
         now = int(time.time())
-        grace_expires_at = now + max(0, cfg.offline_grace_seconds)
+        grace_expires_at = self._grace_expires_at(cfg, token, now)
         ttl = min(
             int(self._services.config.access_token_ttl_seconds), max(60, grace_expires_at - now)
         )
@@ -411,10 +458,7 @@ class CloudAccountService:
         session_id: str,
     ) -> IssuedCloudSession:
         now = int(time.time())
-        existing = self._services.cloud_session_repo.get(session_id)
-        grace = (
-            existing.grace_expires_at if existing is not None else now + cfg.offline_grace_seconds
-        )
+        grace = self._grace_expires_at(cfg, token, now)
         ttl = min(int(self._services.config.access_token_ttl_seconds), max(60, grace - now))
         if cfg.offline_grace_seconds == 0:
             ttl = min(ttl, token.expires_in)
@@ -426,6 +470,7 @@ class CloudAccountService:
                 else None
             ),
             cloud_expires_at=now + token.expires_in,
+            grace_expires_at=grace,
         )
         jwt_token, issued_ttl = MfaService(self._services).mint_access_token(
             user, cloud_session=session_id, ttl_seconds=ttl
@@ -460,10 +505,11 @@ class CloudAccountService:
                 "cloud service rejected this installation's credentials",
             )
         if exc.reason == "rate_limited":
+            minutes = max(1, (exc.retry_after + 59) // 60)
             return OctopError(
                 ErrorCode.LOGIN_LOCKED,
                 "cloud service is rate limiting sign-ins",
-                details={"retry_after_seconds": exc.retry_after, "minutes": 1},
+                details={"retry_after_seconds": exc.retry_after, "minutes": minutes},
             )
         return OctopError(
             ErrorCode.CLOUD_ACCOUNT_UNAVAILABLE,

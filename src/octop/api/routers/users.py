@@ -632,6 +632,11 @@ async def patch_user(
     if body.permissions is not None:
         await server.user_manager.set_permissions(row.username, body.permissions)
     if "role_name" in body.model_fields_set:
+        if getattr(row, "source", "local") == "cloud":
+            raise OctopError(
+                ErrorCode.CLOUD_MANAGED_ACCOUNT,
+                "cloud-managed accounts cannot change role_name locally",
+            )
         server.services.user_repo.set_role_name(user_id, _clean_role_name(body.role_name))
     if "avatar_icon" in body.model_fields_set:
         from octop.infra.users.profile_avatar import clean_avatar_icon, delete_profile_avatar

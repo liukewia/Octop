@@ -63,14 +63,15 @@ export function spawnSidecar(launch: SidecarLaunch): ChildProcess {
 
 /** Send SIGTERM to the whole process group (POSIX) or taskkill /T (Windows). */
 export function signalTree(child: ChildProcess, signal: "SIGTERM" | "SIGKILL"): void {
+  if (child.pid === undefined) return;
   if (process.platform === "win32") {
     const flag = signal === "SIGKILL" ? "/F" : "";
     spawn("taskkill", ["/pid", String(child.pid), "/T", flag].filter(Boolean), {
       stdio: "ignore",
+      windowsHide: true,
     });
     return;
   }
-  if (child.pid === undefined) return;
   try {
     process.kill(-child.pid, signal);
   } catch {

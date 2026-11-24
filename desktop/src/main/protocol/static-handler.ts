@@ -8,12 +8,19 @@ import { resolve, sep } from "node:path";
 
 /** Resolve a request path to a file inside ``root``, or ``null`` if it escapes. */
 export function resolveStaticPath(root: string, pathname: string): string | null {
-  let rel = decodeURIComponent(pathname.replace(/^\/+/, ""));
+  let rel: string;
+  try {
+    rel = decodeURIComponent(pathname.replace(/^\/+/, ""));
+  } catch {
+    return null;
+  }
+  if (rel.includes("\0")) return null;
   if (rel === "" || rel === ".") rel = "index.html";
   if (!rel.includes(".")) rel = rel.replace(/\/?$/, "/index.html");
-  const abs = resolve(root, rel);
-  const rootWithSep = root.endsWith(sep) ? root : root + sep;
-  if (abs !== root && !abs.startsWith(rootWithSep)) return null;
+  const normRoot = resolve(root);
+  const abs = resolve(normRoot, rel);
+  const rootWithSep = normRoot.endsWith(sep) ? normRoot : normRoot + sep;
+  if (!abs.startsWith(rootWithSep)) return null;
   return abs;
 }
 

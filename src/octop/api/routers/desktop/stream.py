@@ -271,15 +271,24 @@ async def desktop_stream_ws(
             await _send_json(websocket, {"type": "error", "message": "expected start message"})
             return
 
-        auth_token = _auth_token_from_start(
-            start_msg, presented_access_token(token, websocket.cookies)
-        )
+        explicit_token = _auth_token_from_start(start_msg, token)
+        auth_token = explicit_token or presented_access_token(None, websocket.cookies)
         if not auth_token:
             await _send_json(
                 websocket, {"type": "error", "code": "AUTH_FAILED", "message": "missing token"}
             )
             await websocket.close(code=4001, reason="missing token")
             return
+        if not explicit_token:
+            from octop.api.common.session_cookie import websocket_cookie_origin_allowed
+
+            if not websocket_cookie_origin_allowed(websocket, server):
+                await _send_json(
+                    websocket,
+                    {"type": "error", "code": "AUTH_FAILED", "message": "origin not allowed"},
+                )
+                await websocket.close(code=4003, reason="origin not allowed")
+                return
         try:
             user = resolve_user_from_token(server, auth_token)
         except Exception as exc:

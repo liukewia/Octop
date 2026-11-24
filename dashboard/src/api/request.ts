@@ -318,7 +318,13 @@ const SESSION_UNAUTHORIZED_CODES = new Set([
   "AUTH_FAILED",
   "MISSING_CREDENTIALS",
   "TOKEN_EXPIRED",
+  "CLOUD_ACCOUNT_SESSION_REVOKED",
 ]);
+
+let _cloudRefreshInFlight: {
+  token: string;
+  promise: Promise<{ access_token: string } | null>;
+} | null = null;
 
 /**
  * Send the user to the login screen exactly once, no matter how many parallel
@@ -403,19 +409,31 @@ async function retryWithDesktopSession(
   response: Response,
 ): Promise<Response | null> {
   if (response.status !== 401) return null;
-  // A rejected login is a credential problem, not an expired session.
-  if (path.startsWith("/auth/login") || path.startsWith("/auth/device/")) {
+  // Auth endpoints (login, refresh, MFA, passkey, device) handle their own 401s;
+  // retrying them here would loop recursively on a rejected cloud refresh.
+  if (path.startsWith("/auth/")) {
     return null;
   }
   // Business 401s (peer login, setup guards) would only be retried in vain.
   const code = await errorCodeOf(response);
+  if (code === "CLOUD_ACCOUNT_SESSION_REVOKED") return null;
   if (code && !SESSION_UNAUTHORIZED_CODES.has(code)) return null;
   const current = getAuthToken();
   // A cloud account keeps its refresh token on the server; the expired local
   // JWT is only the lookup key, so this never needs a password prompt.
   if (current && isCloudSessionToken(current)) {
-    const { cloudAuthApi } = await import("./modules/cloudAuth");
-    const issued = await cloudAuthApi.refresh(current).catch(() => null);
+    if (!_cloudRefreshInFlight || _cloudRefreshInFlight.token !== current) {
+      const promise = import("./modules/cloudAuth")
+        .then(({ cloudAuthApi }) => cloudAuthApi.refresh(current))
+        .catch(() => null)
+        .finally(() => {
+          if (_cloudRefreshInFlight?.token === current) {
+            _cloudRefreshInFlight = null;
+          }
+        });
+      _cloudRefreshInFlight = { token: current, promise };
+    }
+    const issued = await _cloudRefreshInFlight.promise;
     if (!issued?.access_token) return null;
     setAuthToken(issued.access_token, !isSessionOnlyAuth());
     return fetch(url, {

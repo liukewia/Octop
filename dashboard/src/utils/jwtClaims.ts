@@ -8,11 +8,17 @@
 
 function readClaims(token: string): Record<string, unknown> | null {
   const parts = token.split(".");
-  if (parts.length < 2) return null;
+  if (parts.length !== 3) return null;
   try {
     const payload = parts[1].replace(/-/g, "+").replace(/_/g, "/");
     const padded = payload + "=".repeat((4 - (payload.length % 4)) % 4);
-    const parsed = JSON.parse(atob(padded)) as unknown;
+    const binary = atob(padded);
+    const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+    const json =
+      typeof TextDecoder !== "undefined"
+        ? new TextDecoder().decode(bytes)
+        : binary;
+    const parsed = JSON.parse(json) as unknown;
     return parsed && typeof parsed === "object"
       ? (parsed as Record<string, unknown>)
       : null;

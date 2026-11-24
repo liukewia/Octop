@@ -76,7 +76,7 @@ def install(app: Any, server: Any) -> None:
                 renewed = maybe_sliding_renew_token(server, raw, request.state.octop_user)
             except OctopError:
                 renewed = None
-            if renewed and request.url.path != "/api/auth/logout":
+            if renewed and request.url.path not in ("/api/auth/logout", "/api/auth/cloud/logout"):
                 response.headers[ACCESS_TOKEN_RESPONSE_HEADER] = renewed
                 ttl = 0
                 services = getattr(server, "services", None)

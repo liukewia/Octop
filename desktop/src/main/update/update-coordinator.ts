@@ -127,12 +127,7 @@ export function selectRelease(
     return true;
   });
 
-  eligible.sort((a, b) => {
-    // Both parse (filtered above); higher version first.
-    const aTag = a.tag.startsWith("v") ? a.tag.slice(1) : a.tag;
-    const bTag = b.tag.startsWith("v") ? b.tag.slice(1) : b.tag;
-    return parseVersion(bTag)! > parseVersion(aTag)! ? 1 : -1;
-  });
+  eligible.sort((a, b) => compareVersions(b.tag, a.tag));
 
   const best = eligible[0];
   if (!best) return null;

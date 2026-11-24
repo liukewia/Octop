@@ -577,7 +577,7 @@
     "CLOUD_ACCOUNT_DISABLED": "该云端账号已被停用。",
     "CLOUD_ACCOUNT_SESSION_REVOKED": "云端会话已失效，请重新登录。",
     "CLOUD_MANAGED_ACCOUNT": "该账号由云端管控，本地不能修改密码、角色或权限。",
-    "CLOUD_ACCOUNT_BAD_REQUEST": "云端账号配置不合法：{message}"
+    "CLOUD_ACCOUNT_BAD_REQUEST": "云端账号配置不合法：{detail}"
   },
   "desktop": {
     "install_log_deps": "正在安装 Python 依赖…",

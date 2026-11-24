@@ -128,8 +128,14 @@ function linuxAutostartEntry(execPath: string, args: readonly string[]): string 
   ].join("\n");
 }
 
-/** Freedesktop `Exec` quoting. Bare tokens stay bare; spaces and quotes are wrapped. */
+/** Freedesktop `Exec` quoting. Bare tokens stay bare; special chars are escaped inside quotes. */
 function quoteDesktopExec(token: string): string {
+  if (/[\r\n]/.test(token)) {
+    throw new Error("Autostart Exec token must not contain newlines");
+  }
   if (/^[A-Za-z0-9_./:=@-]+$/.test(token)) return token;
-  return `"${token.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+  const escaped = token
+    .replace(/%/g, "%%")
+    .replace(/([\\"`$])/g, "\\$1");
+  return `"${escaped}"`;
 }

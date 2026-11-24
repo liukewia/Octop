@@ -33,7 +33,7 @@ class CloudLoginBody(BaseModel):
 class CloudRefreshBody(BaseModel):
     """An expired local token, used only to locate the local cloud session."""
 
-    access_token: str = Field(min_length=16, max_length=8192)
+    access_token: str | None = Field(default=None, min_length=16, max_length=8192)
 
 
 def _session_payload(issued: IssuedCloudSession, server: Any) -> dict[str, Any]:
@@ -77,11 +77,14 @@ async def login(
 
 @router.post("/refresh", summary="Renew a cloud session without a password")
 async def refresh(
-    body: CloudRefreshBody,
     request: Request,
+    body: CloudRefreshBody | None = None,
     server: Any = Depends(get_server),
 ) -> Any:
-    issued = await server.cloud_account_service.refresh(body.access_token)
+    token = (body.access_token if body is not None else None) or request.cookies.get(SESSION_COOKIE)
+    if not token:
+        raise OctopError(ErrorCode.AUTH_FAILED, "access token or session cookie is required")
+    issued = await server.cloud_account_service.refresh(token)
     return _session_payload(issued, server)
 
 

@@ -18,6 +18,8 @@ export type FetchLike = (
 export interface DownloadOptions {
   /** ``total`` is 0 when the server omits content-length. */
   onProgress?: (received: number, total: number) => void;
+  /** Optional check applied to ``res.url`` after following redirects. */
+  validateFinalUrl?: (url: string) => boolean;
 }
 
 export async function downloadToFile(
@@ -27,6 +29,9 @@ export async function downloadToFile(
   options: DownloadOptions = {},
 ): Promise<void> {
   const res = await fetchImpl(url, { cache: "no-store" });
+  if (options.validateFinalUrl && res.url && !options.validateFinalUrl(res.url)) {
+    throw new Error("下载失败：重定向地址不在允许范围内");
+  }
   if (!res.ok) throw new Error(`下载失败：HTTP ${res.status}`);
   if (!res.body) throw new Error("下载失败：响应没有内容");
 

@@ -378,6 +378,7 @@ class UserManager:
         permissions: builtins.list[str] | None,
         locale: str | None,
         allow_admin: bool = True,
+        auto_provision: bool = True,
     ) -> User:
         """Project a cloud account into the local user table.
 
@@ -389,6 +390,11 @@ class UserManager:
         async with self._lock:
             row = self._services.user_repo.get_by_cloud_identity(issuer, subject)
             if row is None:
+                if not auto_provision:
+                    raise OctopError(
+                        ErrorCode.CLOUD_ACCOUNT_DISABLED,
+                        "automatic provisioning is disabled for cloud accounts",
+                    )
                 from octop.infra.db.repos.user_roles import seeded_user_role_assignment
 
                 assignment = seeded_user_role_assignment(self._services.db)
@@ -449,13 +455,14 @@ class UserManager:
                 if owner is not None and owner.id != row.id:
                     email_clean = None
 
-            locale_clean = normalize_locale(locale)
+            locale_update = normalize_locale(locale) if locale is not None else None
+            effective_locale = locale_update or normalize_locale(row.locale)
             self._services.user_repo.update_cloud_profile(
                 row.id,
                 role=desired_role,
                 display_name=display_name,
                 email=email_clean,
-                locale=locale_clean,
+                locale=locale_update,
                 permissions=desired_perms,
                 role_name=desired_name,
                 synced_at=int(time.time()),
@@ -468,14 +475,14 @@ class UserManager:
                     username=row.username,
                     role=desired_role,
                     display_name=display_name,
-                    locale=locale_clean,
+                    locale=effective_locale,
                     permissions=list(desired_perms),
                 )
                 self._users[row.username] = cached
             else:
                 cached.role = desired_role
                 cached.display_name = display_name
-                cached.locale = locale_clean
+                cached.locale = effective_locale
                 cached.permissions = list(desired_perms)
             return cached
 
@@ -486,8 +493,10 @@ class UserManager:
         The cloud row then gets a host suffix, and a numeric one if that is taken
         too. Login resolves by cloud subject, never by this label.
         """
+        from octop.infra.utils.paths import is_single_path_segment
+
         base = _USERNAME_ALLOWED.sub("", (preferred or "").strip())[:_MAX_USERNAME_LENGTH]
-        if not base:
+        if not base or not is_single_path_segment(base):
             digest = hashlib.sha256(f"{issuer}|{subject}".encode()).hexdigest()[:10]
             base = f"cloud_{digest}"
         if self._services.user_repo.get_by_username(base) is None:
@@ -987,6 +996,7 @@ class UserManager:
         row = self._services.user_repo.get_by_username(username)
         if row is None:
             raise OctopError(ErrorCode.NOT_FOUND, "user not found")
+        _require_local_account(row, action="enabled")
         self._services.user_repo.set_disabled(row.id, False)
         user = User(
             id=row.id,

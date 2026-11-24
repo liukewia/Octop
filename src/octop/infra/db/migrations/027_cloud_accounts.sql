@@ -1,4 +1,4 @@
--- Schema v26: cloud-managed accounts running on a local installation.
+-- Schema v27: cloud-managed accounts running on a local installation.
 --
 -- A row whose ``source`` is ``cloud`` is a local projection of an account that
 -- lives in the cloud identity service: no local password, no local role edits,
@@ -36,3 +36,5 @@ CREATE INDEX IF NOT EXISTS idx_cloud_sessions_user
 
 CREATE INDEX IF NOT EXISTS idx_cloud_sessions_grace
   ON cloud_sessions(grace_expires_at);
+
+UPDATE _schema_version SET version = 27;

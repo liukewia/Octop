@@ -655,10 +655,18 @@ async def bridge_browser_stream_ws(
 ) -> None:
     """Dashboard screencast WS relayed to the peer browser harness."""
     server = websocket.app.state.octop_server
-    raw_token = presented_access_token(websocket.query_params.get("token"), websocket.cookies)
+    raw_query = websocket.query_params.get("token")
+    query_token = raw_query.strip() if isinstance(raw_query, str) and raw_query.strip() else None
+    raw_token = presented_access_token(query_token, websocket.cookies)
     if not raw_token:
         await websocket.close(code=4001, reason="missing token")
         return
+    if query_token is None:
+        from octop.api.common.session_cookie import websocket_cookie_origin_allowed
+
+        if not websocket_cookie_origin_allowed(websocket, server):
+            await websocket.close(code=4003, reason="origin not allowed")
+            return
     try:
         user = resolve_user_from_token(server, raw_token)
     except OctopError as exc:

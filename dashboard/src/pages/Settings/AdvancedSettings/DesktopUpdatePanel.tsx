@@ -41,36 +41,53 @@ export default function DesktopUpdatePanel() {
     : null;
 
   useEffect(() => {
+    let cancelled = false;
     void getDesktopBridge()
       ?.clientSettings.get()
-      .then(setSettings)
+      .then((next) => {
+        if (!cancelled) setSettings(next);
+      })
       .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
     const bridge = getDesktopBridge();
+    let cancelled = false;
     let sawEvent = false;
     const unsubscribe =
       bridge?.onUpdateActivity?.((next) => {
         sawEvent = true;
-        setActivity(next);
+        if (!cancelled) setActivity(next);
       }) ?? (() => {});
     void bridge
       ?.updateActivity?.()
       .then((next) => {
-        if (!sawEvent) setActivity(next);
+        if (!cancelled && !sawEvent) setActivity(next);
       })
       .catch(() => {});
-    return unsubscribe;
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, []);
 
   const handleStableOnlyChange = useCallback(
     async (checked: boolean) => {
-      const next = await getDesktopBridge()?.clientSettings.set({
-        stableOnly: checked,
-      });
-      if (next) setSettings(next);
-      await refreshStatus(true);
+      setChecking(true);
+      try {
+        const next = await getDesktopBridge()?.clientSettings.set({
+          stableOnly: checked,
+        });
+        if (next) setSettings(next);
+        await refreshStatus(true);
+      } catch {
+        // Keep the previous setting if the IPC call fails.
+      } finally {
+        setChecking(false);
+      }
     },
     [refreshStatus],
   );

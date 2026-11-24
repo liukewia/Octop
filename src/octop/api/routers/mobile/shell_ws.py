@@ -66,11 +66,19 @@ async def adb_shell_ws(
 
     await websocket.accept()
 
-    token = presented_access_token(token, websocket.cookies)
+    query_token = token.strip() if isinstance(token, str) and token.strip() else None
+    token = presented_access_token(query_token, websocket.cookies)
     if not token or not token.strip():
         await _send_json(websocket, {"type": "error", "message": "missing token"})
         await websocket.close(code=4001, reason="missing token")
         return
+    if query_token is None:
+        from octop.api.common.session_cookie import websocket_cookie_origin_allowed
+
+        if not websocket_cookie_origin_allowed(websocket, server):
+            await _send_json(websocket, {"type": "error", "message": "origin not allowed"})
+            await websocket.close(code=4003, reason="origin not allowed")
+            return
     try:
         user: User = resolve_user_from_token(server, token.strip())
     except Exception as exc:

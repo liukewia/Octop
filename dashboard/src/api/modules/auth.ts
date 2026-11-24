@@ -89,6 +89,7 @@ export interface OctopUser {
   default_backend_type?: string | null;
   /** ``local`` owns its password; ``cloud`` is a projection of a cloud account. */
   source?: "local" | "cloud";
+  account_source?: "local" | "cloud";
   cloud_managed?: boolean;
   cloud_issuer?: string | null;
   cloud_synced_at?: number | null;
@@ -613,9 +614,10 @@ export const authApi = {
   logout: async () => {
     const token = getAuthToken();
     if (token && isCloudSessionToken(token)) {
-      // Revoke the cloud session too, while the local token is still valid.
+      // Cloud logout revokes the cloud session and clears the session cookie.
       const { cloudAuthApi } = await import("./cloudAuth");
       await cloudAuthApi.logout().catch(() => undefined);
+      return;
     }
     return request<void>("/auth/logout", { method: "POST" }).catch(
       () => undefined,

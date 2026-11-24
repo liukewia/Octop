@@ -34,6 +34,11 @@ async def prove_password(
     row = services.user_repo.get(user_id)
     if row is None:
         raise OctopError(ErrorCode.AUTH_FAILED, "user not found")
+    if getattr(row, "source", "local") == "cloud":
+        raise OctopError(
+            ErrorCode.CLOUD_MANAGED_ACCOUNT,
+            "cloud-managed accounts cannot use local password reauth",
+        )
     if row.password_hash:
         if verify_password(password, row.password_hash):
             return

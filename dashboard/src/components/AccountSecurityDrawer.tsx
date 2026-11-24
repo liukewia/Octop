@@ -236,14 +236,27 @@ function CloudSessionsCard() {
   // identity, or the effect below would refetch on every render.
   const tRef = useRef(t);
   tRef.current = t;
+  const mountedRef = useRef(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const load = useCallback(async () => {
     const translate = tRef.current;
+    setLoadFailed(false);
     try {
       const result = await cloudAuthApi.sessions();
+      if (!mountedRef.current) return;
       setRows(result.sessions);
     } catch (err) {
+      if (!mountedRef.current) return;
       setRows([]);
+      setLoadFailed(true);
       message.error(
         apiErrorMessage(
           err,
@@ -346,6 +359,10 @@ function CloudSessionsCard() {
       <div className={styles.cardExtra}>
         {rows === null ? (
           <Spin />
+        ) : loadFailed ? (
+          <p className={styles.cardDesc}>
+            {t("account.cloudSessionsLoadFailed")}
+          </p>
         ) : rows.length === 0 ? (
           <p className={styles.cardDesc}>{t("account.cloudSessionsEmpty")}</p>
         ) : (

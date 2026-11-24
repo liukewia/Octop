@@ -54,6 +54,7 @@ import { isApiPath, sanitizeForwardHeaders, toBackendUrl } from "./protocol/stre
 import { WsRelay } from "./protocol/ws-relay";
 import {
   channelHeadTag,
+  isValidAssetUrl,
   manifestFromDownloadsResponse,
   platformAssetKey,
   selectRelease,
@@ -84,7 +85,7 @@ import {
   windowsMenuModel,
   type WindowsMenuCommandId,
 } from "./windows/app-menu";
-import { createEarlyWindow } from "./windows/early-window";
+import { createEarlyWindow, setBeforeRelaunchHook } from "./windows/early-window";
 import {
   commitLoginItem,
   linuxAutostartDir,
@@ -400,6 +401,7 @@ async function prepareShellUpdate(
       download: async (plan) => {
         const dest = join(dir, plan.filename);
         await downloadToFile(plan.url, dest, net.fetch, {
+          validateFinalUrl: isValidAssetUrl,
           onProgress: (received, total) => {
             const percent = total > 0 ? Math.min(100, Math.round((received / total) * 100)) : null;
             const now = Date.now();
@@ -547,21 +549,38 @@ function registerIpcHandlers(): void {
 
       preparedUpdate = { kind: outcome.plan.kind, path: outcome.path };
       publishUpdate({ phase: "installing" });
+      // An unsigned dmg cannot replace the running app. Leave this process up
+      // and let the user finish in the Finder window we just opened.
+      if (outcome.plan.kind === "dmg") {
+        try {
+          await handOffToInstaller(outcome.plan.kind, outcome.path);
+        } catch (err) {
+          preparedUpdate = null;
+          publishUpdate({ phase: "idle" });
+          await showShellError(win, shellT("shell.updateFailed"), errorMessageOf(err));
+          return;
+        }
+        publishUpdate({ phase: "ready" });
+        attentionForReady(win);
+        return;
+      }
+
+      // Stop the relay and Python sidecar before handing off to OS installers
+      // (especially Windows NSIS/MSI) so no background process holds file locks.
+      apiAdmissionClosed = true;
+      stopDashboardDevServer();
+      await wsRelay?.stop().catch(() => undefined);
+      await supervisor?.stop().catch(() => undefined);
       try {
         await handOffToInstaller(outcome.plan.kind, outcome.path);
       } catch (err) {
+        apiAdmissionClosed = false;
         preparedUpdate = null;
         publishUpdate({ phase: "idle" });
         await showShellError(win, shellT("shell.updateFailed"), errorMessageOf(err));
         return;
       }
-      // An unsigned dmg cannot replace the running app. Leave this process up
-      // and let the user finish in the Finder window we just opened.
-      if (outcome.plan.kind === "dmg") {
-        publishUpdate({ phase: "ready" });
-        attentionForReady(win);
-        return;
-      }
+      quitting = true;
       app.quit();
     } finally {
       updateInFlight = false;
@@ -786,7 +805,7 @@ function showAboutDialog(version: string): void {
     message: "Octop",
     detail: formatAboutDetail({
       version,
-      setup: windowsInstallScope(process.execPath),
+      setup: process.platform === "win32" ? windowsInstallScope(process.execPath) : null,
       commit: stamp.commit,
       date: stamp.date,
       electron: process.versions.electron ?? "",
@@ -1210,20 +1229,28 @@ app.on("activate", () => {
   revealAppWindow();
 });
 
+setBeforeRelaunchHook(async () => {
+  quitting = true;
+  destroySystemTray();
+  stopDashboardDevServer();
+  await wsRelay?.stop().catch(() => undefined);
+  await supervisor?.stop().catch(() => undefined);
+});
+
 app.on("before-quit", (event) => {
   if (quitting) return;
+  quitting = true;
   destroySystemTray();
+  stopDashboardDevServer();
   const sidecar = supervisor;
   const relay = wsRelay;
   if (!sidecar && !relay) return;
   // §3.4: the sidecar runs in its own process group, so quitting without
   // waiting would orphan Python. Give it the grace window, then really quit.
   event.preventDefault();
-  quitting = true;
   // Close the relay first: nothing may attach to a sidecar that is shutting
   // down, and its listening socket would keep the process alive otherwise.
   void (async () => {
-    stopDashboardDevServer();
     await relay?.stop();
     await sidecar?.stop();
   })()

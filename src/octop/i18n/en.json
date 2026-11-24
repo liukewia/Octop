@@ -577,7 +577,7 @@
     "CLOUD_ACCOUNT_DISABLED": "This cloud account has been disabled.",
     "CLOUD_ACCOUNT_SESSION_REVOKED": "The cloud session is no longer valid. Sign in again.",
     "CLOUD_MANAGED_ACCOUNT": "This account is managed by the cloud service; password, role, and permissions cannot be edited locally.",
-    "CLOUD_ACCOUNT_BAD_REQUEST": "Invalid cloud account configuration: {message}"
+    "CLOUD_ACCOUNT_BAD_REQUEST": "Invalid cloud account configuration: {detail}"
   },
   "desktop": {
     "install_log_deps": "Installing Python dependencies…",

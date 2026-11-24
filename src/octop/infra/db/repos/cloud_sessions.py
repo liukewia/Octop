@@ -108,9 +108,13 @@ class CloudSessionRepo:
         refresh_token_enc: bytes | None = None,
         cloud_expires_at: int | None = None,
         grace_expires_at: int | None = None,
+        update_last_seen: bool = True,
     ) -> None:
-        fields = ["last_seen_at = ?"]
-        params: list[object] = [now_ts()]
+        fields: list[str] = []
+        params: list[object] = []
+        if update_last_seen:
+            fields.append("last_seen_at = ?")
+            params.append(now_ts())
         if refresh_token_enc is not None:
             fields.append("refresh_token_enc = ?")
             params.append(refresh_token_enc)
@@ -120,6 +124,8 @@ class CloudSessionRepo:
         if grace_expires_at is not None:
             fields.append("grace_expires_at = ?")
             params.append(int(grace_expires_at))
+        if not fields:
+            return
         params.append(session_id)
         with self._db.transaction() as conn:
             conn.execute(
@@ -175,7 +181,7 @@ class CloudSessionRepo:
         ts = int(time.time()) if now is None else now
         with self._db.transaction() as conn:
             cur = conn.execute(
-                "DELETE FROM cloud_sessions WHERE grace_expires_at <= ? AND revoked_at IS NOT NULL",
+                "DELETE FROM cloud_sessions WHERE grace_expires_at <= ?",
                 (ts,),
             )
             return int(cur.rowcount or 0)

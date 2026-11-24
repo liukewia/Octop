@@ -44,6 +44,7 @@ def me_payload(user: Any, server: Any) -> dict[str, Any]:
     payload["account_source"] = account_source
     payload["cloud_managed"] = account_source == "cloud"
     payload["cloud_issuer"] = getattr(row, "cloud_issuer", None) if row is not None else None
+    payload["cloud_synced_at"] = getattr(row, "cloud_synced_at", None) if row is not None else None
     if row is None:
         payload["sso_linked"] = False
         payload["sso_kind"] = None
@@ -152,6 +153,8 @@ def _directory_may_own(row: Any) -> bool:
     """
     if row is None:
         return True
+    if getattr(row, "source", "local") == "cloud":
+        return False
     return not row.password_hash
 
 
@@ -238,7 +241,26 @@ async def logout(
     user: Any = Depends(current_user),
     server: Any = Depends(get_server),
 ) -> Response:
-    """Record an audit event for the current session. JWTs are stateless and not revoked server-side."""
+    """Record an audit event for the current session and revoke any cloud session."""
+    from octop.api.common.session_cookie import SESSION_COOKIE
+    from octop.api.deps import extract_raw_token
+    from octop.infra.auth.tokens import InvalidToken, decode_token, token_cloud_session
+
+    raw = extract_raw_token(
+        authorization=request.headers.get("authorization"),
+        access_token=request.query_params.get("access_token"),
+        cookie=request.cookies.get(SESSION_COOKIE),
+    )
+    if raw:
+        secret = server.services.secret_repo.get("jwt")
+        if secret is not None:
+            try:
+                payload = decode_token(secret, raw, verify_expiry=False)
+                session_id = token_cloud_session(payload)
+            except InvalidToken:
+                session_id = None
+            if session_id and getattr(server, "cloud_account_service", None) is not None:
+                await server.cloud_account_service.logout(session_id)
     server.services.audit_repo.write(actor=user.username, action="auth.logout")
     response = Response(status_code=204)
     clear_session_cookie(response, request)

@@ -321,7 +321,9 @@ export default function LoginPage() {
       conditionalAbortRef.current?.abort();
       setAuthToken(accessToken, remember);
       setMfaChallenge(null);
+      setCloudMfa(null);
       setMfaCode("");
+      setPassword("");
       const applied = await applyUserLocale(locale);
       void refreshServerLabels(applied);
       navigate("/chat", { replace: true });
@@ -333,6 +335,7 @@ export default function LoginPage() {
   useEffect(() => {
     if (
       mfaChallenge ||
+      cloudMfa ||
       !passwordlessLogin ||
       !passkeyAvailable ||
       passkeyIpHost ||
@@ -378,6 +381,7 @@ export default function LoginPage() {
       }
     };
   }, [
+    cloudMfa,
     conditionalOk,
     finishLogin,
     mfaChallenge,
@@ -475,7 +479,12 @@ export default function LoginPage() {
         otp: mfaCode.trim(),
         mfaToken: cloudMfa.mfa_token ?? undefined,
       });
-      if (isCloudMfaChallenge(res)) return;
+      if (isCloudMfaChallenge(res)) {
+        setCloudMfa(res);
+        setMfaCode("");
+        message.error(t("login.mfaFailed"));
+        return;
+      }
       await finishLogin(res.access_token, res.user.locale);
     } catch (err) {
       message.error(apiErrorMessage(err, t("login.mfaFailed"), t));
@@ -693,6 +702,7 @@ export default function LoginPage() {
             onClick={() => {
               setCloudMfa(null);
               setMfaCode("");
+              setPassword("");
             }}
           >
             {t("login.mfaBack")}
@@ -1052,8 +1062,11 @@ export default function LoginPage() {
             size="large"
             block
             onClick={() => {
-              if (cloud.signup_url) {
-                window.open(cloud.signup_url, "_blank", "noopener");
+              if (
+                cloud.signup_url &&
+                /^https?:\/\//i.test(cloud.signup_url)
+              ) {
+                window.open(cloud.signup_url, "_blank", "noopener,noreferrer");
               }
             }}
             style={{ borderRadius: 10, height: 44, fontWeight: 500 }}

@@ -1,5 +1,5 @@
--- Schema v26: cloud-managed accounts running on a local installation.
--- See 026_cloud_accounts.sql for the data model notes.
+-- Schema v27: cloud-managed accounts running on a local installation.
+-- See 027_cloud_accounts.sql for the data model notes.
 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'local';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS cloud_issuer TEXT;
@@ -28,3 +28,5 @@ CREATE INDEX IF NOT EXISTS idx_cloud_sessions_user
 
 CREATE INDEX IF NOT EXISTS idx_cloud_sessions_grace
   ON cloud_sessions(grace_expires_at);
+
+UPDATE _schema_version SET version = 27;

@@ -2121,13 +2121,18 @@ def _ensure_user_mfa_schema(db: DatabasePool) -> None:
 
 
 def _ensure_cloud_account_schema(db: DatabasePool) -> None:
-    """Cloud-managed account projection + local cloud sessions (v26). Idempotent."""
+    """Cloud-managed account projection + local cloud sessions (v27). Idempotent."""
     if not _table_exists(db, "users"):
         return
     _ensure_column(db, "users", "source", "TEXT NOT NULL DEFAULT 'local'")
     _ensure_column(db, "users", "cloud_issuer", "TEXT")
     _ensure_column(db, "users", "cloud_subject", "TEXT")
-    _ensure_column(db, "users", "cloud_synced_at", "INTEGER")
+    _ensure_column(
+        db,
+        "users",
+        "cloud_synced_at",
+        "BIGINT" if db.dialect == "postgresql" else "INTEGER",
+    )
     if db.dialect == "postgresql":
         with db.connect() as conn, conn.transaction():
             conn.execute(
@@ -2604,7 +2609,7 @@ def _apply_sqlite_migration(db: DatabasePool, version: int, path: Path) -> None:
         with db.connect() as conn:
             conn.execute("UPDATE _schema_version SET version = ?", (version,))
         return
-    if version == 26:
+    if version == 27:
         _ensure_cloud_account_schema(db)
         with db.connect() as conn:
             conn.execute("UPDATE _schema_version SET version = ?", (version,))
@@ -2876,6 +2881,7 @@ def run_migrations(db: DatabasePool) -> None:
     _ensure_control_blobs_schema(db)
     _ensure_thread_contributed_schema(db)
     _ensure_invite_redemptions_schema(db)
+    _ensure_cloud_account_schema(db)
     _grant_default_nav_permissions(db)
     _grant_personalization_tab_permissions(db)
     _grant_bridge_permission(db)

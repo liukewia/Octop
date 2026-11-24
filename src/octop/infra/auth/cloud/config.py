@@ -79,6 +79,8 @@ def normalize_base_url(raw: str) -> str:
         raise CloudConfigError("cloud service URL must be http(s)")
     if not parsed.hostname:
         raise CloudConfigError("cloud service URL has no host")
+    if parsed.username or parsed.password:
+        raise CloudConfigError("cloud service URL must not contain credentials")
     if parsed.query or parsed.fragment:
         raise CloudConfigError("cloud service URL must not carry a query or fragment")
     if parsed.scheme == "http":

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Button,
@@ -42,11 +42,13 @@ function toFormValues(config: CloudAdminConfig): CloudFormValues {
     client_secret: "",
     allow_admin: config.allow_admin,
     sync_permissions: config.sync_permissions,
-    offline_grace_days: Math.max(
-      0,
-      Math.round(config.offline_grace_seconds / 86400),
-    ),
-    request_timeout_seconds: config.request_timeout_seconds,
+    offline_grace_days: config.configured
+      ? Math.max(0, Math.round(config.offline_grace_seconds / 86400))
+      : 7,
+    request_timeout_seconds:
+      config.request_timeout_seconds >= 3
+        ? config.request_timeout_seconds
+        : 10,
     signup_url: config.signup_url ?? "",
   };
 }
@@ -71,25 +73,36 @@ export default function CloudAccountsPanel() {
     text: string;
   } | null>(null);
 
+  const tRef = useRef(t);
+  tRef.current = t;
+
   const load = useCallback(async () => {
     setLoading(true);
+    const translate = tRef.current;
     try {
       const next = await cloudAdminApi.getConfig();
       setConfig(next);
       form.setFieldsValue(toFormValues(next));
     } catch (err) {
-      message.error(apiErrorMessage(err, t("cloudAccounts.loadFailed"), t));
+      message.error(
+        apiErrorMessage(err, translate("cloudAccounts.loadFailed"), translate),
+      );
     } finally {
       setLoading(false);
     }
-  }, [form, t]);
+  }, [form]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
   const handleSave = async () => {
-    const values = await form.validateFields();
+    let values: CloudFormValues;
+    try {
+      values = await form.validateFields();
+    } catch {
+      return;
+    }
     const body: CloudConfigInput = {
       enabled: values.enabled,
       display_name: values.display_name?.trim() ?? "",
@@ -99,7 +112,7 @@ export default function CloudAccountsPanel() {
         ? values.client_secret.trim()
         : null,
       allow_admin: values.allow_admin,
-      auto_provision: true,
+      auto_provision: config?.auto_provision ?? true,
       sync_permissions: values.sync_permissions,
       offline_grace_seconds: Math.round(values.offline_grace_days * 86400),
       request_timeout_seconds: values.request_timeout_seconds,
@@ -278,10 +291,11 @@ export default function CloudAccountsPanel() {
 
         <Form.Item
           name="allow_admin"
+          label={t("cloudAccounts.allowAdmin")}
           valuePropName="checked"
           style={{ marginBottom: 8 }}
         >
-          <Switch />
+          <Switch aria-label={t("cloudAccounts.allowAdmin")} />
         </Form.Item>
         <p className={styles.ssoSectionHint}>
           {t("cloudAccounts.allowAdminHint")}
@@ -289,10 +303,11 @@ export default function CloudAccountsPanel() {
 
         <Form.Item
           name="sync_permissions"
+          label={t("cloudAccounts.syncPermissions")}
           valuePropName="checked"
           style={{ marginBottom: 8 }}
         >
-          <Switch />
+          <Switch aria-label={t("cloudAccounts.syncPermissions")} />
         </Form.Item>
         <p className={styles.ssoSectionHint}>
           {t("cloudAccounts.syncPermissionsHint")}

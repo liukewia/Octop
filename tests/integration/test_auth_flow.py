@@ -153,6 +153,7 @@ async def test_patch_me_clears_display_name(client) -> None:
 async def test_patch_me_requires_auth(client) -> None:
     c, _srv, home = client
     await bootstrap_admin(c, home)
+    c.cookies.clear()
     r = await c.patch("/api/auth/me", json={"display_name": "Alice"})
     assert r.status_code == 401
 

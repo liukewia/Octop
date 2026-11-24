@@ -10,13 +10,38 @@ from __future__ import annotations
 
 import json
 from typing import Any
+from urllib.parse import urlparse
 
-from fastapi import Request
+from fastapi import Request, WebSocket
 from fastapi.responses import Response
 
 from octop.api.common.sso_cookie import request_is_https
 
 SESSION_COOKIE = "octop_session"
+_TOKEN_ISSUING_PREFIXES = ("/api/auth/", "/api/setup/")
+
+
+def websocket_cookie_origin_allowed(websocket: WebSocket, server: Any | None = None) -> bool:
+    """Guard cookie-authenticated WebSockets against cross-port / sibling-subdomain hijacking."""
+    origin = (websocket.headers.get("origin") or "").strip()
+    if not origin:
+        return False
+    parsed = urlparse(origin)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return False
+    origin_norm = f"{parsed.scheme.lower()}://{parsed.netloc.lower()}"
+    host = (websocket.headers.get("host") or "").strip().lower()
+    if host and parsed.netloc.lower() == host:
+        return True
+    if server is not None:
+        services = getattr(server, "services", None)
+        config = getattr(services, "config", None) if services is not None else None
+        cors_origins = getattr(config, "cors_origins", None) if config is not None else None
+        if isinstance(cors_origins, (list, tuple, set)):
+            for allowed in cors_origins:
+                if isinstance(allowed, str) and allowed.strip().rstrip("/").lower() == origin_norm:
+                    return True
+    return False
 
 
 def cookie_token(cookies: Any) -> str | None:
@@ -48,7 +73,13 @@ def set_session_cookie(response: Response, request: Request, token: str, ttl_sec
 
 
 def clear_session_cookie(response: Response, request: Request) -> None:
-    response.delete_cookie(SESSION_COOKIE, path="/", secure=request_is_https(request))
+    response.delete_cookie(
+        SESSION_COOKIE,
+        path="/",
+        httponly=True,
+        secure=request_is_https(request),
+        samesite="lax",
+    )
 
 
 async def maybe_attach_session_cookie(request: Request, response: Response) -> Response:
@@ -61,6 +92,10 @@ async def maybe_attach_session_cookie(request: Request, response: Response) -> R
     HTTP middleware hands back a streaming response, so the JSON is not on
     ``response.body`` until the body iterator is read.
     """
+    if not (200 <= response.status_code < 300):
+        return response
+    if not request.url.path.startswith(_TOKEN_ISSUING_PREFIXES):
+        return response
     content_type = response.headers.get("content-type", "")
     if "json" not in content_type:
         return response
@@ -74,11 +109,14 @@ async def maybe_attach_session_cookie(request: Request, response: Response) -> R
             if isinstance(chunk, (bytes, bytearray)):
                 chunks.append(bytes(chunk))
         body = b"".join(chunks)
-        response = Response(
+        raw_headers = list(getattr(response, "raw_headers", []))
+        rebuilt = Response(
             content=body,
             status_code=response.status_code,
-            headers=dict(response.headers),
         )
+        if raw_headers:
+            rebuilt.raw_headers = raw_headers
+        response = rebuilt
     try:
         payload = json.loads(body)
     except (UnicodeDecodeError, json.JSONDecodeError, TypeError):

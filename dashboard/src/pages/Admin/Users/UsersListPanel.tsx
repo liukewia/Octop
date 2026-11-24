@@ -1640,11 +1640,19 @@ function UserCardGrid({
                     : undefined
                 }
               />
-              <Tooltip title={t("common.edit")} mouseEnterDelay={0.5}>
+              <Tooltip
+                title={
+                  row.cloud_managed
+                    ? t("adminUsers.cloudManagedHint")
+                    : t("common.edit")
+                }
+                mouseEnterDelay={0.5}
+              >
                 <button
                   type="button"
                   className={styles.userCardIconBtn}
                   onClick={() => onEdit(row)}
+                  disabled={Boolean(row.cloud_managed)}
                   aria-label={t("common.edit")}
                 >
                   <Pencil size={15} />
@@ -1652,13 +1660,18 @@ function UserCardGrid({
               </Tooltip>
 
               <Tooltip
-                title={t("adminUsers.resetPassword")}
+                title={
+                  row.cloud_managed
+                    ? t("adminUsers.cloudManagedHint")
+                    : t("adminUsers.resetPassword")
+                }
                 mouseEnterDelay={0.5}
               >
                 <button
                   type="button"
                   className={styles.userCardIconBtn}
                   onClick={() => onResetPassword(row)}
+                  disabled={Boolean(row.cloud_managed)}
                   aria-label={t("adminUsers.resetPassword")}
                 >
                   <KeyRound size={15} />
@@ -1670,11 +1683,20 @@ function UserCardGrid({
                   username: row.username,
                 })}
                 onConfirm={() => void onResetMfa(row)}
+                disabled={Boolean(row.cloud_managed)}
               >
-                <Tooltip title={t("adminUsers.mfaReset")} mouseEnterDelay={0.5}>
+                <Tooltip
+                  title={
+                    row.cloud_managed
+                      ? t("adminUsers.cloudManagedHint")
+                      : t("adminUsers.mfaReset")
+                  }
+                  mouseEnterDelay={0.5}
+                >
                   <button
                     type="button"
                     className={styles.userCardIconBtn}
+                    disabled={Boolean(row.cloud_managed)}
                     aria-label={t("adminUsers.mfaReset")}
                   >
                     <ShieldCheck size={15} />
@@ -1687,11 +1709,15 @@ function UserCardGrid({
                   username: row.username,
                 })}
                 onConfirm={() => void onDelete(row)}
-                disabled={isSelf}
+                disabled={isSelf || Boolean(row.cloud_managed)}
               >
                 <Tooltip
                   title={
-                    isSelf ? t("adminUsers.deleteSelf") : t("common.delete")
+                    row.cloud_managed
+                      ? t("adminUsers.cloudManagedHint")
+                      : isSelf
+                      ? t("adminUsers.deleteSelf")
+                      : t("common.delete")
                   }
                   mouseEnterDelay={0.5}
                 >
@@ -1701,7 +1727,7 @@ function UserCardGrid({
                       styles.userCardIconBtn,
                       styles.userCardIconBtnDanger,
                     )}
-                    disabled={isSelf}
+                    disabled={isSelf || Boolean(row.cloud_managed)}
                     aria-label={t("common.delete")}
                   >
                     <Trash2 size={15} />
@@ -2670,7 +2696,9 @@ export default function UsersListPanel() {
               width: 120,
               render: (_, row) => {
                 const parts = [
-                  row.directory
+                  row.cloud_managed
+                    ? t("adminUsers.cloudBadge")
+                    : row.directory
                     ? t("adminUsers.directoryBadge")
                     : row.sso_linked
                     ? t("adminUsers.ssoBadge")
@@ -2727,6 +2755,12 @@ export default function UsersListPanel() {
                 <Switch
                   size="small"
                   checked={!row.disabled}
+                  disabled={Boolean(row.cloud_managed)}
+                  title={
+                    row.cloud_managed
+                      ? t("adminUsers.cloudManagedHint")
+                      : undefined
+                  }
                   onChange={(checked) =>
                     togglePatch(row, { disabled: !checked })
                   }
@@ -2770,76 +2804,104 @@ export default function UsersListPanel() {
               title: t("adminUsers.colActions"),
               width: 120,
               fixed: isMobile ? undefined : "right",
-              render: (_, row) => (
-                <Space size={4}>
-                  <Tooltip title={t("common.edit")}>
-                    <button
-                      type="button"
-                      className={styles.userCardIconBtn}
-                      onClick={() => openEdit(row)}
-                      aria-label={t("common.edit")}
-                    >
-                      <Pencil size={14} />
-                    </button>
-                  </Tooltip>
-                  <Tooltip title={t("adminUsers.resetPassword")}>
-                    <button
-                      type="button"
-                      className={styles.userCardIconBtn}
-                      onClick={() => {
-                        setResetTarget(row);
-                        resetForm.resetFields();
-                      }}
-                      aria-label={t("adminUsers.resetPassword")}
-                    >
-                      <KeyRound size={14} />
-                    </button>
-                  </Tooltip>
-                  <Popconfirm
-                    title={t("adminUsers.mfaResetConfirm", {
-                      username: row.username,
-                    })}
-                    onConfirm={() => void onResetMfa(row)}
-                  >
-                    <Tooltip title={t("adminUsers.mfaReset")}>
-                      <button
-                        type="button"
-                        className={styles.userCardIconBtn}
-                        aria-label={t("adminUsers.mfaReset")}
-                      >
-                        <ShieldCheck size={14} />
-                      </button>
-                    </Tooltip>
-                  </Popconfirm>
-                  <Popconfirm
-                    title={t("adminUsers.deleteConfirm", {
-                      username: row.username,
-                    })}
-                    onConfirm={() => onDelete(row)}
-                    disabled={row.id === currentUserId}
-                  >
+              render: (_, row) => {
+                const cloudManaged = Boolean(row.cloud_managed);
+                const deleteDisabled = row.id === currentUserId || cloudManaged;
+                return (
+                  <Space size={4}>
                     <Tooltip
                       title={
-                        row.id === currentUserId
-                          ? t("adminUsers.deleteSelf")
-                          : t("common.delete")
+                        cloudManaged
+                          ? t("adminUsers.cloudManagedHint")
+                          : t("common.edit")
                       }
                     >
                       <button
                         type="button"
-                        className={cx(
-                          styles.userCardIconBtn,
-                          styles.userCardIconBtnDanger,
-                        )}
-                        disabled={row.id === currentUserId}
-                        aria-label={t("common.delete")}
+                        className={styles.userCardIconBtn}
+                        onClick={() => openEdit(row)}
+                        disabled={cloudManaged}
+                        aria-label={t("common.edit")}
                       >
-                        <Trash2 size={14} />
+                        <Pencil size={14} />
                       </button>
                     </Tooltip>
-                  </Popconfirm>
-                </Space>
-              ),
+                    <Tooltip
+                      title={
+                        cloudManaged
+                          ? t("adminUsers.cloudManagedHint")
+                          : t("adminUsers.resetPassword")
+                      }
+                    >
+                      <button
+                        type="button"
+                        className={styles.userCardIconBtn}
+                        onClick={() => {
+                          setResetTarget(row);
+                          resetForm.resetFields();
+                        }}
+                        disabled={cloudManaged}
+                        aria-label={t("adminUsers.resetPassword")}
+                      >
+                        <KeyRound size={14} />
+                      </button>
+                    </Tooltip>
+                    <Popconfirm
+                      title={t("adminUsers.mfaResetConfirm", {
+                        username: row.username,
+                      })}
+                      onConfirm={() => void onResetMfa(row)}
+                      disabled={cloudManaged}
+                    >
+                      <Tooltip
+                        title={
+                          cloudManaged
+                            ? t("adminUsers.cloudManagedHint")
+                            : t("adminUsers.mfaReset")
+                        }
+                      >
+                        <button
+                          type="button"
+                          className={styles.userCardIconBtn}
+                          disabled={cloudManaged}
+                          aria-label={t("adminUsers.mfaReset")}
+                        >
+                          <ShieldCheck size={14} />
+                        </button>
+                      </Tooltip>
+                    </Popconfirm>
+                    <Popconfirm
+                      title={t("adminUsers.deleteConfirm", {
+                        username: row.username,
+                      })}
+                      onConfirm={() => onDelete(row)}
+                      disabled={deleteDisabled}
+                    >
+                      <Tooltip
+                        title={
+                          cloudManaged
+                            ? t("adminUsers.cloudManagedHint")
+                            : row.id === currentUserId
+                            ? t("adminUsers.deleteSelf")
+                            : t("common.delete")
+                        }
+                      >
+                        <button
+                          type="button"
+                          className={cx(
+                            styles.userCardIconBtn,
+                            styles.userCardIconBtnDanger,
+                          )}
+                          disabled={deleteDisabled}
+                          aria-label={t("common.delete")}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </Tooltip>
+                    </Popconfirm>
+                  </Space>
+                );
+              },
             },
           ]}
         />

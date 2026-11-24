@@ -654,6 +654,7 @@ class OctopServer:
         from octop.infra.auth.mfa import MfaService
 
         MfaService(self.services).prune()
+        self.services.cloud_session_repo.delete_expired()
 
         from octop.infra.auth.tokens import PURPOSE_ACCESS, sign_token
         from octop.infra.bridge.manager import BridgeManager, public_base_url_from_config

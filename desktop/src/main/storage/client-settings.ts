@@ -38,8 +38,12 @@ export class ClientSettingsStore {
         // Basic shape validation: only accept known scalar values.
         if (BOOLEAN_KEYS.has(key)) {
           if (typeof value === "boolean") (out as Record<string, unknown>)[key] = value;
-        } else if (typeof value === "string") {
-          (out as Record<string, unknown>)[key] = value;
+        } else if (key === "closeBehavior") {
+          if (value === "quit" || value === "tray") out.closeBehavior = value;
+        } else if (key === "themeBackground") {
+          if (value === "system" || value === "light" || value === "dark") {
+            out.themeBackground = value;
+          }
         }
       }
       return out;
@@ -49,23 +53,28 @@ export class ClientSettingsStore {
   }
 
   save(patch: Partial<ClientSettings>): ClientSettings {
-    const next = { ...this.load(), ...patch };
-    const sanitized: Record<string, unknown> = {};
+    const current = this.load();
+    const record = patch && typeof patch === "object" ? (patch as Record<string, unknown>) : {};
+    const sanitized: ClientSettings = { ...current };
     for (const key of SETTING_KEYS) {
-      const value = (next as Record<string, unknown>)[key];
+      if (!Object.prototype.hasOwnProperty.call(record, key)) continue;
+      const value = record[key];
+      if (value === undefined) continue;
       if (BOOLEAN_KEYS.has(key)) {
-        sanitized[key] = value === true;
+        (sanitized as unknown as Record<string, unknown>)[key] =
+          typeof value === "boolean" ? value : (DEFAULTS as unknown as Record<string, unknown>)[key];
       } else if (key === "closeBehavior") {
-        sanitized[key] = value === "quit" ? "quit" : "tray";
+        sanitized.closeBehavior = value === "quit" || value === "tray" ? value : DEFAULTS.closeBehavior;
       } else if (key === "themeBackground") {
-        sanitized[key] = ["system", "light", "dark"].includes(String(value))
-          ? value
-          : "system";
+        sanitized.themeBackground =
+          value === "system" || value === "light" || value === "dark"
+            ? value
+            : DEFAULTS.themeBackground;
       }
     }
     mkdirSync(dirname(this.filePath), { recursive: true });
     writeFileSync(this.filePath, JSON.stringify(sanitized, null, 2), "utf8");
-    return sanitized as unknown as ClientSettings;
+    return sanitized;
   }
 }
 

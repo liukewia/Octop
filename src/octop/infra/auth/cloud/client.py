@@ -113,7 +113,7 @@ class CloudClient:
 
     def _client(self) -> httpx.AsyncClient:
         return httpx.AsyncClient(
-            base_url=self._config.base_url,
+            base_url=self._config.base_url.rstrip("/") + "/",
             timeout=float(self._config.request_timeout_seconds),
             follow_redirects=False,
             transport=self._transport,
@@ -156,7 +156,7 @@ class CloudClient:
         try:
             async with self._client() as client:
                 await client.post(
-                    REVOKE_PATH,
+                    REVOKE_PATH.lstrip("/"),
                     json={
                         "token": token,
                         "client_id": self._config.client_id,
@@ -170,7 +170,7 @@ class CloudClient:
         try:
             async with self._client() as client:
                 response = await client.get(
-                    USERINFO_PATH,
+                    USERINFO_PATH.lstrip("/"),
                     headers={"authorization": f"Bearer {access_token}"},
                 )
         except httpx.HTTPError as exc:
@@ -186,7 +186,7 @@ class CloudClient:
     async def probe(self) -> dict[str, Any]:
         try:
             async with self._client() as client:
-                response = await client.get(HEALTH_PATH, timeout=5.0)
+                response = await client.get(HEALTH_PATH.lstrip("/"), timeout=5.0)
         except httpx.HTTPError as exc:
             raise CloudAuthError("unavailable", str(exc)) from exc
         data = _json_or_none(response)
@@ -203,7 +203,7 @@ class CloudClient:
     async def _token_request(self, payload: dict[str, Any]) -> CloudToken:
         try:
             async with self._client() as client:
-                response = await client.post(TOKEN_PATH, json=payload)
+                response = await client.post(TOKEN_PATH.lstrip("/"), json=payload)
         except httpx.HTTPError as exc:
             raise CloudAuthError("unavailable", str(exc)) from exc
 
