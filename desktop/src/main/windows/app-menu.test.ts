@@ -3,6 +3,7 @@ import { test } from "node:test";
 import type { MenuItemConstructorOptions } from "electron";
 
 import {
+  macApplicationMenu,
   windowsApplicationMenu,
   windowsAppMenuLabels,
   windowsMenuCommandId,
@@ -75,6 +76,8 @@ test("页面上的菜单带中文标签和快捷键", () => {
   const model = windowsMenuModel("zh-CN");
   assert.deepEqual(model.titles, ["文件", "编辑", "视图", "帮助"]);
   assert.deepEqual(model.menus[0], [
+    { kind: "command", id: "connectionSettings", label: "连接设置…", accelerator: "Ctrl+Shift+K" },
+    { kind: "separator" },
     { kind: "command", id: "close", label: "关闭", accelerator: "Ctrl+W" },
     { kind: "separator" },
     { kind: "command", id: "quit", label: "退出", accelerator: null },
@@ -83,11 +86,34 @@ test("页面上的菜单带中文标签和快捷键", () => {
   assert.equal(model.menus[3][0]?.kind === "command" && model.menus[3][0].accelerator, null);
 });
 
-test("英文菜单用 Exit，不接受菜单以外的命令", () => {
+test("英文菜单用 Exit，包含统一的连接设置入口", () => {
   const file = windowsMenuModel("en-US").menus[0];
-  assert.equal(file[2]?.kind === "command" && file[2].label, "Exit");
+  assert.equal(file[0]?.kind === "command" && file[0].label, "Connection Settings…");
+  const exitEntry = file[file.length - 1];
+  assert.equal(exitEntry?.kind === "command" && exitEntry.label, "Exit");
   assert.equal(windowsMenuCommandId("copy"), "copy");
+  assert.equal(windowsMenuCommandId("connectionSettings"), "connectionSettings");
   assert.equal(windowsMenuCommandId("about"), "about");
   assert.equal(windowsMenuCommandId("new-agent"), null);
   assert.equal(windowsMenuCommandId(0), null);
+
+  let opened = 0;
+  const macMenu = macApplicationMenu("zh-CN", {
+    onAbout: () => {},
+    onConnectionSettings: () => {
+      opened += 1;
+    },
+  });
+  assert.equal(macMenu[0]?.label, "Octop");
+  const appSub = macMenu[0]?.submenu;
+  assert.ok(Array.isArray(appSub));
+  const settingsItem = appSub.find((item) => item.id === "connectionSettings");
+  assert.ok(settingsItem);
+  assert.equal(settingsItem.label, "连接设置…");
+  settingsItem.click?.({} as never, undefined, {} as never);
+  assert.equal(opened, 1);
+
+  const fileSub = macMenu[1]?.submenu;
+  assert.ok(Array.isArray(fileSub));
+  assert.equal(fileSub.some((item) => item.id === "connectionSettings"), false);
 });

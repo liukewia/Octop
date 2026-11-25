@@ -154,4 +154,77 @@ describe("desktop device session", () => {
     expect(session.renew).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledOnce();
   });
+
+  it("does not recurse when cloud refresh itself returns 401", async () => {
+    const cloudToken = (() => {
+      const payload = btoa(JSON.stringify({ sub: "1", uname: "alice", csid: "sess-1" }))
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=+$/, "");
+      return `h.${payload}.s`;
+    })();
+    mod.setAuthToken(cloudToken);
+    fetchMock.mockResolvedValue(tokenExpiredResponse());
+
+    await expect(
+      mod.request("/auth/cloud/refresh", { method: "POST", body: "{}" }),
+    ).rejects.toThrow();
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("clears token and redirects without refreshing on CLOUD_ACCOUNT_SESSION_REVOKED", async () => {
+    const cloudToken = (() => {
+      const payload = btoa(JSON.stringify({ sub: "1", uname: "alice", csid: "sess-1" }))
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=+$/, "");
+      return `h.${payload}.s`;
+    })();
+    mod.setAuthToken(cloudToken);
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: { code: "CLOUD_ACCOUNT_SESSION_REVOKED", message: "revoked" },
+        }),
+        { status: 401, headers: { "content-type": "application/json" } },
+      ),
+    );
+
+    await expect(mod.request("/agents")).rejects.toThrow();
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(mod.getAuthToken()).toBe("");
+    expect(replace).toHaveBeenCalledWith("/login");
+  });
+
+  it("retries requestBlob and requestStream once after silent session renewal", async () => {
+    const renewed = tokenFor("local");
+    const session = installBridge(renewed);
+    mod.setAuthToken(tokenFor("local"));
+    fetchMock
+      .mockResolvedValueOnce(tokenExpiredResponse())
+      .mockResolvedValueOnce(
+        new Response("binary-data", {
+          status: 200,
+          headers: { "content-type": "application/octet-stream" },
+        }),
+      );
+
+    const blob = await mod.requestBlob("/files/1");
+    expect(await blob.text()).toBe("binary-data");
+    expect(session.renew).toHaveBeenCalledOnce();
+
+    session.renew.mockClear();
+    fetchMock
+      .mockResolvedValueOnce(tokenExpiredResponse())
+      .mockResolvedValueOnce(
+        new Response("stream-data", {
+          status: 200,
+          headers: { "content-type": "audio/mpeg" },
+        }),
+      );
+
+    const streamRes = await mod.requestStream("/voice/tts", { method: "POST" });
+    expect(streamRes.contentType).toBe("audio/mpeg");
+    expect(session.renew).toHaveBeenCalledOnce();
+  });
 });

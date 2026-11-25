@@ -12,6 +12,7 @@
  * so the user can finish in the system window.
  */
 
+import { shellT } from "../../shared/shell-i18n";
 import type { SidecarExit } from "../supervisor/sidecar";
 import { isValidAssetUrl, type DownloadAsset, type SelectedRelease } from "./update-coordinator";
 
@@ -138,13 +139,13 @@ export async function fetchUpdatePackage(
     return {
       ok: false,
       reason: "unsupported",
-      message: `不支持的安装包类型：${selected.asset.ext || selected.asset.name}`,
+      message: shellT("update.unsupportedPackage", { ext: selected.asset.ext || selected.asset.name }),
     };
   }
   // Defence in depth: `selectRelease` already filtered on this, but the check
   // lives here too so no future caller can download from an arbitrary host.
   if (!isValidAssetUrl(plan.url)) {
-    return { ok: false, reason: "untrusted-url", message: "安装包地址不在允许的下载主机范围内。" };
+    return { ok: false, reason: "untrusted-url", message: shellT("update.untrustedUrl") };
   }
 
   let path: string;
@@ -156,7 +157,7 @@ export async function fetchUpdatePackage(
 
   try {
     if (!(await hooks.verify(path))) {
-      return { ok: false, reason: "verify", message: "安装包校验失败，已取消安装。" };
+      return { ok: false, reason: "verify", message: shellT("update.verifyFailed") };
     }
   } catch (err) {
     return { ok: false, reason: "verify", message: messageOf(err) };
@@ -181,7 +182,9 @@ export async function commitUpdate(
     return {
       ok: false,
       reason: "unclean-exit",
-      message: `Python 后端未能在宽限期内干净退出（退出码 ${exit.exitCode ?? "无"}），已取消安装。`,
+      message: shellT("update.uncleanExit", {
+        code: exit.exitCode ?? shellT("update.exitCodeNone"),
+      }),
     };
   }
 

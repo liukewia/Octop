@@ -5,6 +5,7 @@
   "error": {
     "title": "Octop could not start",
     "retry": "Try again",
+    "switchToLocal": "Switch to Local",
     "quit": "Quit",
     "details": "Technical details",
     "copy": "Copy error details",
@@ -34,6 +35,22 @@
     "updateCheckFailed": "Could not check for updates",
     "upToDateTitle": "Already up to date",
     "upToDate": "Current version {{version}}.",
-    "updateFailed": "The upgrade failed"
+    "updateFailed": "The upgrade failed",
+    "remoteLoadFailed": "Could not connect to remote server {{url}}.",
+    "remoteLoadFailedDetail": "Reason: {{reason}}\n\nClick \"Switch to Local\" or open Connection Settings from the top-left menu.",
+    "insecureHttpTitle": "Connect over unencrypted HTTP?",
+    "insecureHttpDetail": "You are about to connect to {{url}} over plaintext HTTP.\n\nSecurity risk: HTTP traffic is not encrypted. Your password, session tokens, and conversation data could be intercepted or modified on the network. Use HTTPS unless you trust this private network.",
+    "insecureHttpContinue": "Connect over HTTP anyway",
+    "cancel": "Cancel"
+  },
+  "update": {
+    "unsupportedPackage": "Unsupported installer package type: {{ext}}",
+    "untrustedUrl": "Installer URL is outside the allowed download host.",
+    "verifyFailed": "Installer verification failed. Upgrade cancelled.",
+    "uncleanExit": "Python backend did not exit cleanly within the grace period (exit code {{code}}). Upgrade cancelled.",
+    "exitCodeNone": "none",
+    "downloadRedirectBlocked": "Download failed: redirect target is not allowed",
+    "downloadHttpError": "Download failed: HTTP {{status}}",
+    "downloadEmptyBody": "Download failed: empty response body"
   }
 }

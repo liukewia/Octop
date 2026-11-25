@@ -433,8 +433,18 @@ export default function AccountSecurityDrawer({
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<MfaStatus | null>(null);
   const [profile, setProfile] = useState<OctopUser | null>(null);
+  const [profileFailed, setProfileFailed] = useState(false);
   const [unavailable, setUnavailable] = useState(false);
   const [busy, setBusy] = useState(false);
+  const mountedRef = useRef(true);
+  const loadSeqRef = useRef(0);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const [reauthOpen, setReauthOpen] = useState(false);
   const [reauthAction, setReauthAction] = useState<ReauthAction | null>(null);
@@ -456,20 +466,42 @@ export default function AccountSecurityDrawer({
 
   const loadStatus = useCallback(async () => {
     const translate = tRef.current;
+    const seq = ++loadSeqRef.current;
+    const isCurrent = () => mountedRef.current && loadSeqRef.current === seq;
     setLoading(true);
     setUnavailable(false);
+    setProfileFailed(false);
     try {
-      const me = await authApi.me().catch(() => null);
-      if (me) setProfile(me);
-      if (me?.cloud_managed) {
+      let me: OctopUser;
+      try {
+        me = await authApi.me();
+      } catch (err) {
+        if (!isCurrent()) return;
+        setProfileFailed(true);
+        setStatus(null);
+        message.error(
+          apiErrorMessage(
+            err,
+            translate("account.securityLoadFailed"),
+            translate,
+          ),
+        );
+        return;
+      }
+      if (!isCurrent()) return;
+      setProfile(me);
+      if (me.cloud_managed) {
         // The cloud owns password, factors, and permissions, so the local MFA
         // routes have nothing to report for this account.
         setStatus(null);
         return;
       }
       try {
-        setStatus(await authApi.mfaStatus());
+        const nextStatus = await authApi.mfaStatus();
+        if (!isCurrent()) return;
+        setStatus(nextStatus);
       } catch (err) {
+        if (!isCurrent()) return;
         if (isNotFoundApiError(err)) {
           setUnavailable(true);
           setStatus(null);
@@ -484,7 +516,9 @@ export default function AccountSecurityDrawer({
         }
       }
     } finally {
-      setLoading(false);
+      if (isCurrent()) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -637,6 +671,12 @@ export default function AccountSecurityDrawer({
         <div className={styles.loading}>
           <Spin />
         </div>
+      ) : profileFailed && !profile ? (
+        <Alert
+          type="error"
+          showIcon
+          message={t("account.securityLoadFailed")}
+        />
       ) : cloudManaged ? (
         <div className={styles.stack}>
           <div className={styles.introBlock}>

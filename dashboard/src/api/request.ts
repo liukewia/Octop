@@ -395,29 +395,24 @@ async function throwIfUnauthorized(
 }
 
 /**
- * Retry a 401 once with a JWT minted by the desktop shell.
- *
- * A desktop user has no password to type, so an expired session used to be a
- * dead end. The shell holds a device credential and can issue a new token; on
- * the web this returns null immediately and the caller falls through to the
- * ordinary login redirect.
+ * Try to refresh an expired session (cloud refresh token or desktop device
+ * credential) in place. Returns ``true`` when a fresh access token was stored
+ * and the caller should retry the request once.
  */
-async function retryWithDesktopSession(
+async function refreshSessionFor401(
   path: string,
-  url: string,
-  options: RequestInit,
   response: Response,
-): Promise<Response | null> {
-  if (response.status !== 401) return null;
+): Promise<boolean> {
+  if (response.status !== 401) return false;
   // Auth endpoints (login, refresh, MFA, passkey, device) handle their own 401s;
   // retrying them here would loop recursively on a rejected cloud refresh.
   if (path.startsWith("/auth/")) {
-    return null;
+    return false;
   }
   // Business 401s (peer login, setup guards) would only be retried in vain.
   const code = await errorCodeOf(response);
-  if (code === "CLOUD_ACCOUNT_SESSION_REVOKED") return null;
-  if (code && !SESSION_UNAUTHORIZED_CODES.has(code)) return null;
+  if (code === "CLOUD_ACCOUNT_SESSION_REVOKED") return false;
+  if (code && !SESSION_UNAUTHORIZED_CODES.has(code)) return false;
   const current = getAuthToken();
   // A cloud account keeps its refresh token on the server; the expired local
   // JWT is only the lookup key, so this never needs a password prompt.
@@ -434,24 +429,40 @@ async function retryWithDesktopSession(
       _cloudRefreshInFlight = { token: current, promise };
     }
     const issued = await _cloudRefreshInFlight.promise;
-    if (!issued?.access_token) return null;
+    if (!issued?.access_token) return false;
     setAuthToken(issued.access_token, !isSessionOnlyAuth());
-    return fetch(url, {
-      ...options,
-      headers: buildHeaders(path, options.headers),
-    });
+    return true;
   }
   // A password account's expired token must land on the login page. Only the
   // desktop local user is renewed in place.
-  if (current && !isLocalDesktopUser(current)) return null;
+  if (current && !isLocalDesktopUser(current)) return false;
   const issued = await renewDesktopSession();
   if (!issued?.access_token || !isLocalDesktopUser(issued.access_token)) {
-    return null;
+    return false;
   }
   setAuthToken(issued.access_token, !isSessionOnlyAuth());
+  return true;
+}
+
+/**
+ * Retry a 401 once with a refreshed JWT (cloud refresh or desktop shell).
+ *
+ * A desktop user has no password to type, so an expired session used to be a
+ * dead end. The shell holds a device credential and can issue a new token; on
+ * the web this returns null immediately and the caller falls through to the
+ * ordinary login redirect.
+ */
+async function retryWithDesktopSession(
+  path: string,
+  url: string,
+  options: RequestInit,
+  response: Response,
+  rebuildHeaders: () => HeadersInit = () => buildHeaders(path, options.headers),
+): Promise<Response | null> {
+  if (!(await refreshSessionFor401(path, response))) return null;
   return fetch(url, {
     ...options,
-    headers: buildHeaders(path, options.headers),
+    headers: rebuildHeaders(),
   });
 }
 
@@ -524,11 +535,22 @@ export async function requestBlob(
   assertNotSetupLocked(path);
 
   const url = getApiUrl(path);
-  const headers = buildAuthHeaders(path);
-  const response = await fetch(url, {
-    ...options,
-    headers: { ...headers, ...(options.headers as Record<string, string>) },
+  const rebuildAuthHeaders = () => ({
+    ...buildAuthHeaders(path),
+    ...(options.headers as Record<string, string>),
   });
+  let response = await fetch(url, {
+    ...options,
+    headers: rebuildAuthHeaders(),
+  });
+  const retried = await retryWithDesktopSession(
+    path,
+    url,
+    options,
+    response,
+    rebuildAuthHeaders,
+  );
+  if (retried) response = retried;
 
   if (await check503ForSetupRequired(path, response)) {
     throw new SetupRequiredError();
@@ -577,11 +599,22 @@ export async function probeAuthResource(
   assertNotSetupLocked(path);
 
   const url = getApiUrl(path);
-  const headers = buildAuthHeaders(path);
-  const response = await fetch(url, {
-    ...options,
-    headers: { ...headers, ...(options.headers as Record<string, string>) },
+  const rebuildAuthHeaders = () => ({
+    ...buildAuthHeaders(path),
+    ...(options.headers as Record<string, string>),
   });
+  let response = await fetch(url, {
+    ...options,
+    headers: rebuildAuthHeaders(),
+  });
+  const retried = await retryWithDesktopSession(
+    path,
+    url,
+    options,
+    response,
+    rebuildAuthHeaders,
+  );
+  if (retried) response = retried;
 
   if (await check503ForSetupRequired(path, response)) {
     throw new SetupRequiredError();
@@ -617,11 +650,22 @@ export async function requestStream(
   assertNotSetupLocked(path);
 
   const url = getApiUrl(path);
-  const headers = buildAuthHeaders(path);
-  const response = await fetch(url, {
-    ...options,
-    headers: { ...headers, ...(options.headers as Record<string, string>) },
+  const rebuildAuthHeaders = () => ({
+    ...buildAuthHeaders(path),
+    ...(options.headers as Record<string, string>),
   });
+  let response = await fetch(url, {
+    ...options,
+    headers: rebuildAuthHeaders(),
+  });
+  const retried = await retryWithDesktopSession(
+    path,
+    url,
+    options,
+    response,
+    rebuildAuthHeaders,
+  );
+  if (retried) response = retried;
 
   if (await check503ForSetupRequired(path, response)) {
     throw new SetupRequiredError();
@@ -664,102 +708,96 @@ export async function requestUpload<T = unknown>(
   assertNotSetupLocked(path);
 
   const url = getApiUrl(path);
-  const headers = buildAuthHeaders(path);
   const method = options.method ?? "POST";
 
-  return new Promise<T>((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open(method, url);
+  const sendOnce = (): Promise<Response> =>
+    new Promise<Response>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open(method, url);
 
-    for (const [key, value] of Object.entries(headers)) {
-      xhr.setRequestHeader(key, value);
-    }
-    if (options.headers) {
-      const extraEntries =
-        options.headers instanceof Headers
-          ? Array.from(options.headers.entries())
-          : Array.isArray(options.headers)
-          ? options.headers
-          : Object.entries(options.headers);
-      for (const [k, v] of extraEntries) {
-        xhr.setRequestHeader(k, String(v));
+      for (const [key, value] of Object.entries(buildAuthHeaders(path))) {
+        xhr.setRequestHeader(key, value);
       }
-    }
-
-    if (onProgress) {
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable && event.total > 0) {
-          onProgress(Math.round((event.loaded / event.total) * 100));
+      if (options.headers) {
+        const extraEntries =
+          options.headers instanceof Headers
+            ? Array.from(options.headers.entries())
+            : Array.isArray(options.headers)
+            ? options.headers
+            : Object.entries(options.headers);
+        for (const [k, v] of extraEntries) {
+          xhr.setRequestHeader(k, String(v));
         }
-      };
-    }
-
-    if (options.signal) {
-      if (options.signal.aborted) {
-        reject(new DOMException("The operation was aborted.", "AbortError"));
-        return;
       }
-      options.signal.addEventListener(
-        "abort",
-        () => {
-          xhr.abort();
-        },
-        { once: true },
-      );
-    }
 
-    xhr.onload = () => {
-      void (async () => {
-        const status = xhr.status;
-        const responseText = xhr.responseText;
+      if (onProgress) {
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable && event.total > 0) {
+            onProgress(Math.round((event.loaded / event.total) * 100));
+          }
+        };
+      }
+
+      if (options.signal) {
+        if (options.signal.aborted) {
+          reject(new DOMException("The operation was aborted.", "AbortError"));
+          return;
+        }
+        options.signal.addEventListener(
+          "abort",
+          () => {
+            xhr.abort();
+          },
+          { once: true },
+        );
+      }
+
+      xhr.onload = () => {
         const responseHeaders = new Headers();
         const renewed = xhr.getResponseHeader(ACCESS_TOKEN_RESPONSE_HEADER);
         if (renewed) {
           responseHeaders.set(ACCESS_TOKEN_RESPONSE_HEADER, renewed);
         }
-        const response = new Response(responseText, {
-          status,
-          headers: responseHeaders,
-        });
+        resolve(
+          new Response(xhr.responseText, {
+            status: xhr.status,
+            headers: responseHeaders,
+          }),
+        );
+      };
 
-        if (await check503ForSetupRequired(path, response)) {
-          reject(new SetupRequiredError());
-          return;
-        }
+      xhr.onerror = () => reject(new Error("Network error"));
+      xhr.onabort = () =>
+        reject(new DOMException("The operation was aborted.", "AbortError"));
 
-        try {
-          await throwIfUnauthorized(path, response);
-        } catch (err) {
-          reject(err);
-          return;
-        }
+      xhr.send(body);
+    });
 
-        applyRenewedAccessToken(response);
+  let response = await sendOnce();
+  if (await refreshSessionFor401(path, response)) {
+    response = await sendOnce();
+  }
 
-        if (!response.ok) {
-          // Same shape as request() so parseApiError() can read the error envelope.
-          reject(
-            new Error(
-              `Upload failed: ${status}${
-                responseText ? ` - ${responseText}` : ""
-              }`,
-            ),
-          );
-          return;
-        }
+  if (await check503ForSetupRequired(path, response)) {
+    throw new SetupRequiredError();
+  }
 
-        try {
-          resolve((await response.json()) as T);
-        } catch {
-          reject(new Error("Upload failed: invalid JSON response"));
-        }
-      })();
-    };
+  await throwIfUnauthorized(path, response);
+  applyRenewedAccessToken(response);
 
-    xhr.onerror = () => reject(new Error("Network error"));
-    xhr.onabort = () =>
-      reject(new DOMException("The operation was aborted.", "AbortError"));
+  if (!response.ok) {
+    const responseText = await response.text().catch(() => "");
+    // Same shape as request() so parseApiError() can read the error envelope.
+    throw new Error(
+      `Upload failed: ${response.status}${
+        responseText ? ` - ${responseText}` : ""
+      }`,
+    );
+  }
 
-    xhr.send(body);
-  });
+  try {
+    return (await response.json()) as T;
+  } catch {
+    throw new Error("Upload failed: invalid JSON response");
+  }
 }

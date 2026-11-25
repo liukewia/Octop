@@ -8,12 +8,7 @@
   min-height: 0;
   box-sizing: border-box;
   padding: 32px 24px;
-  background: radial-gradient(
-      720px 380px at 50% -8%,
-      color-mix(in srgb, var(--fn-color-brand) 11%, transparent),
-      transparent 68%
-    ),
-    var(--fn-bg-layout, #f5f6f8);
+  background: var(--fn-bg-layout, #f5f6f8);
 }
 
 .viewport {
@@ -27,14 +22,6 @@
   animation: brandLoadingIn 420ms ease-out both;
 }
 
-.logo {
-  display: block;
-  height: 72px;
-  width: auto;
-  max-width: min(260px, 75vw);
-  object-fit: contain;
-}
-
 .status {
   --octop-spinner-size: 22px;
   --octop-spinner-ring-width: 2px;
@@ -42,7 +29,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  margin: 24px 0 0;
+  margin: 0;
   font-size: 16px;
   font-weight: 500;
   line-height: 1;

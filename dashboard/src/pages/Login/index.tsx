@@ -57,7 +57,7 @@ import {
   releaseDesktopLocalAutoLogin,
   renewDesktopSession,
 } from "../../api/desktopSession";
-import { isDesktopShell } from "../../utils/desktopBridge";
+import { getDesktopBridge, isDesktopShell } from "../../utils/desktopBridge";
 import {
   cloudAuthApi,
   isCloudMfaChallenge,
@@ -220,8 +220,24 @@ export default function LoginPage() {
           return;
         }
         if (isDesktopShell()) {
-          setShowCreateLocal(true);
-          setLocalAccountExists(status.local_account);
+          const connBridge = getDesktopBridge()?.connection;
+          if (connBridge) {
+            void connBridge
+              .get()
+              .then((conn) => {
+                if (cancelled) return;
+                if (conn.mode !== "remote") {
+                  setShowCreateLocal(true);
+                  setLocalAccountExists(status.local_account);
+                } else {
+                  setShowCreateLocal(false);
+                }
+              })
+              .catch(() => {});
+          } else {
+            setShowCreateLocal(true);
+            setLocalAccountExists(status.local_account);
+          }
         }
         // Only probe OIDC / captcha after setup is done — otherwise lockdown 503s.
         authApi
@@ -398,6 +414,17 @@ export default function LoginPage() {
     resetCaptcha();
   };
 
+  const ssoPopupTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (ssoPopupTimerRef.current !== null) {
+        window.clearInterval(ssoPopupTimerRef.current);
+        ssoPopupTimerRef.current = null;
+      }
+    };
+  }, []);
+
   const onSso = async (kind: string) => {
     setSsoLoadingKind(kind);
     setRememberLoginPreference(remember);
@@ -413,12 +440,19 @@ export default function LoginPage() {
       }
       if (popup && !popup.closed) {
         popup.location.href = authorization_url;
+        if (ssoPopupTimerRef.current !== null) {
+          window.clearInterval(ssoPopupTimerRef.current);
+        }
         const timer = window.setInterval(() => {
           if (!popup || popup.closed) {
             window.clearInterval(timer);
+            if (ssoPopupTimerRef.current === timer) {
+              ssoPopupTimerRef.current = null;
+            }
             setSsoLoadingKind((current) => (current === kind ? null : current));
           }
         }, 400);
+        ssoPopupTimerRef.current = timer;
       } else {
         popup?.close();
         message.error(t("account.ssoPopupBlocked"));

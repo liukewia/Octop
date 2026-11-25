@@ -22,12 +22,22 @@ import { pathToFileURL } from "node:url";
 import {
   IPC_CHANNELS,
   type ClientSettings,
+  type ConnectionState,
   type IssuedSession,
   type PlatformInfo,
   type UpdateActivity,
   type UpdateCheckResult,
 } from "../shared/ipc-contract";
+import { encodeShellError, SHELL_ERROR_PARAM, type ShellFailure } from "../shared/shell-error";
 import { changeShellLanguage, shellT } from "../shared/shell-i18n";
+import {
+  isInsecureRemoteUrl,
+  normalizeRemoteServerUrl,
+  remoteServerEntryUrl,
+  removeSavedServer,
+  serverOriginOf,
+  upsertSavedServer,
+} from "./connection/server-target";
 import { resolveAppVersion } from "./app-version";
 import { desktopLog, installDesktopLog } from "./log/desktop-log";
 import { DeviceCredentialStore } from "./session/device-credential";
@@ -80,9 +90,11 @@ import {
   windowsInstallScope,
 } from "./windows/about-info";
 import {
+  macApplicationMenu,
   windowsApplicationMenu,
   windowsMenuCommandId,
   windowsMenuModel,
+  type AppMenuHandlers,
   type WindowsMenuCommandId,
 } from "./windows/app-menu";
 import { createEarlyWindow, setBeforeRelaunchHook } from "./windows/early-window";
@@ -148,6 +160,13 @@ let tray: Tray | null = null;
 let trayIcon: NativeImage | null = null;
 // Set once the Dashboard has opened, so a later Dock click can open it again.
 let dashboardOrigin: string | null = null;
+let activeConnectionMode: "local" | "remote" = "local";
+let activeRemoteUrl: string | null = null;
+let octopHomeDir = "";
+let protocolRegistered = false;
+let protocolStaticRoot = "";
+let ipcHandlersRegistered = false;
+let switchingConnection = false;
 // Current loopback port of the sidecar. Read per request (not captured), so a
 // restart after a failed install can hand the proxy a new port.
 let backendPort = 0;
@@ -260,12 +279,15 @@ async function writeLocalVersion(octopHome: string, version: string): Promise<vo
 }
 
 function registerProtocol(staticRootDir: string): void {
+  protocolStaticRoot = staticRootDir;
+  if (protocolRegistered) return;
+  protocolRegistered = true;
   protocol.handle("octop", async (request) => {
     const url = new URL(request.url);
     const pathname = url.pathname;
 
     if (isApiPath(pathname)) {
-      if (apiAdmissionClosed) return new Response("update in progress", { status: 503 });
+      if (apiAdmissionClosed || !backendPort) return new Response("service unavailable", { status: 503 });
       const target = toBackendUrl(backendPort, pathname, url.search);
       const headers = sanitizeForwardHeaders(request.headers);
       headers["x-octop-proxy"] = "1";
@@ -280,10 +302,10 @@ function registerProtocol(staticRootDir: string): void {
 
     // Escape stays forbidden. A client route with no file falls back to
     // index.html; otherwise View → Reload of /chat returns an empty page.
-    if (!resolveStaticPath(staticRootDir, pathname)) {
+    if (!protocolStaticRoot || !resolveStaticPath(protocolStaticRoot, pathname)) {
       return new Response("forbidden", { status: 403 });
     }
-    const filePath = resolveDashboardFile(staticRootDir, pathname, existsSync);
+    const filePath = resolveDashboardFile(protocolStaticRoot, pathname, existsSync);
     if (!filePath) return new Response("not found", { status: 404 });
     // Serve via file URL so large assets stream instead of buffering in memory.
     return net.fetch(pathToFileURL(filePath).toString()).then((res) => {
@@ -433,6 +455,9 @@ async function reopenDownloadedInstaller(): Promise<void> {
 }
 
 function registerIpcHandlers(): void {
+  if (ipcHandlersRegistered) return;
+  ipcHandlersRegistered = true;
+
   ipcMain.handle(IPC_CHANNELS.getPlatformInfo, (): PlatformInfo => ({
     platform: process.platform as PlatformInfo["platform"],
     arch: process.arch,
@@ -444,10 +469,11 @@ function registerIpcHandlers(): void {
     return windowsMenuModel(app.getLocale());
   });
   ipcMain.handle(IPC_CHANNELS.windowsMenuInvoke, (event, id: unknown) => {
-    const command = windowsMenuCommandId(id);
-    if (!command || !usesCaptionOverlay()) return;
+    if (!usesCaptionOverlay()) return;
     const win = BrowserWindow.fromWebContents(event.sender);
     if (!win || win.isDestroyed()) return;
+    const command = windowsMenuCommandId(id);
+    if (!command) return;
     runWindowsMenuCommand(win, command);
   });
 
@@ -587,6 +613,22 @@ function registerIpcHandlers(): void {
     }
   });
 
+  ipcMain.handle(IPC_CHANNELS.openDirectoryPicker, async (event): Promise<string | null> => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const result = win
+      ? await dialog.showOpenDialog(win, { properties: ["openDirectory"] })
+      : await dialog.showOpenDialog({ properties: ["openDirectory"] });
+    return result.canceled ? null : (result.filePaths[0] ?? null);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.openFilePicker, async (event): Promise<string | null> => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const result = win
+      ? await dialog.showOpenDialog(win, { properties: ["openFile"] })
+      : await dialog.showOpenDialog({ properties: ["openFile"] });
+    return result.canceled ? null : (result.filePaths[0] ?? null);
+  });
+
   ipcMain.handle(IPC_CHANNELS.openInstaller, async (event) => {
     const win = BrowserWindow.fromWebContents(event.sender) ?? BrowserWindow.getAllWindows()[0] ?? null;
     try {
@@ -597,17 +639,47 @@ function registerIpcHandlers(): void {
   });
 
   ipcMain.handle(IPC_CHANNELS.sessionRegister, (_event, accessToken: unknown): Promise<boolean> => {
-    if (!isUsableAccessToken(accessToken)) return Promise.resolve(false);
+    if (activeConnectionMode !== "local" || !isUsableAccessToken(accessToken)) {
+      return Promise.resolve(false);
+    }
     return deviceSession?.register(accessToken) ?? Promise.resolve(false);
   });
 
   ipcMain.handle(IPC_CHANNELS.sessionRenew, (): Promise<IssuedSession | null> => {
+    if (activeConnectionMode !== "local") return Promise.resolve(null);
     return deviceSession?.renew() ?? Promise.resolve(null);
   });
 
   ipcMain.handle(IPC_CHANNELS.sessionRevoke, (_event, accessToken: unknown): Promise<boolean> => {
-    if (!isUsableAccessToken(accessToken)) return Promise.resolve(false);
+    if (activeConnectionMode !== "local" || !isUsableAccessToken(accessToken)) {
+      return Promise.resolve(false);
+    }
     return deviceSession?.revoke(accessToken) ?? Promise.resolve(false);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.connectionGet, (): ConnectionState => currentConnectionState());
+  ipcMain.handle(IPC_CHANNELS.connectionSwitchLocal, async (event): Promise<ConnectionState> => {
+    const win = BrowserWindow.fromWebContents(event.sender) ?? undefined;
+    return switchToLocal(win);
+  });
+  ipcMain.handle(
+    IPC_CHANNELS.connectionSwitchRemote,
+    async (event, payload: unknown): Promise<ConnectionState> => {
+      const record = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
+      const url = typeof record.url === "string" ? record.url : "";
+      const label = typeof record.label === "string" ? record.label : undefined;
+      const win = BrowserWindow.fromWebContents(event.sender) ?? undefined;
+      return switchToRemote(url, label, win);
+    },
+  );
+  ipcMain.handle(IPC_CHANNELS.connectionRemoveSaved, (_event, url: unknown): ConnectionState => {
+    if (typeof url !== "string" || !url.trim()) return currentConnectionState();
+    const settings = settingsStore.load();
+    const nextSaved = removeSavedServer(settings.savedRemoteServers, url);
+    settingsStore.save({ savedRemoteServers: nextSaved });
+    const next = currentConnectionState();
+    broadcastConnectionState(next);
+    return next;
   });
 
   // The page reports its theme so the native controls follow it; window buttons
@@ -728,6 +800,62 @@ function watchLinuxCaptionState(win: BrowserWindow): void {
   win.on("unmaximize", publish);
 }
 
+function currentConnectionState(): ConnectionState {
+  const settings = settingsStore.load();
+  return {
+    mode: settings.connectionMode,
+    remoteUrl: settings.connectionMode === "remote" ? settings.remoteServerUrl : null,
+    savedServers: settings.savedRemoteServers,
+  };
+}
+
+function broadcastConnectionState(state: ConnectionState): void {
+  installAppMenu(appVersion);
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (win.isDestroyed() || win.webContents.isDestroyed()) continue;
+    win.webContents.send(IPC_CHANNELS.connectionChanged, state);
+  }
+}
+
+function requestOpenConnectionSwitcher(win?: BrowserWindow): void {
+  const target =
+    (win && !win.isDestroyed() ? win : null) ??
+    BrowserWindow.getFocusedWindow() ??
+    BrowserWindow.getAllWindows().find((w) => !w.isDestroyed()) ??
+    null;
+  if (!target || target.isDestroyed() || target.webContents.isDestroyed()) return;
+  target.show();
+  target.focus();
+  target.webContents.send(IPC_CHANNELS.connectionOpenSwitcher);
+}
+
+function showWindowError(win: BrowserWindow, failure: ShellFailure): void {
+  if (win.isDestroyed()) return;
+  const chromeTheme = resolveWindowChromeTheme(settingsStore.load().themeBackground);
+  const payload = encodeShellError({ ...failure, version: appVersion });
+  void win.loadFile(ERROR_PATH, {
+    query: { [SHELL_ERROR_PARAM]: payload, theme: chromeTheme.mode },
+  });
+}
+
+function entryUrlForTarget(targetUrl: string): string {
+  const chromeTheme = resolveWindowChromeTheme(settingsStore.load().themeBackground);
+  const scheme = chromeTheme.scheme ?? chromeTheme.mode;
+  if (activeConnectionMode === "remote" && activeRemoteUrl) {
+    return remoteServerEntryUrl(scheme, activeRemoteUrl);
+  }
+  return dashboardEntryUrl(scheme, targetUrl);
+}
+
+function handleWindowLoadFail(win: BrowserWindow, failedUrl: string, errorDescription: string): void {
+  if (activeConnectionMode !== "remote" || !activeRemoteUrl) return;
+  desktopLog().warn(`remote server load failed url=${failedUrl} reason=${errorDescription}`);
+  showWindowError(win, {
+    message: shellT("shell.remoteLoadFailed", { url: activeRemoteUrl }),
+    detail: errorDetail(shellT("shell.remoteLoadFailedDetail", { reason: errorDescription })),
+  });
+}
+
 function openDashboardWindow(appOrigin: string): BrowserWindow {
   dashboardOrigin = appOrigin;
   const chromeTheme = resolveWindowChromeTheme(settingsStore.load().themeBackground);
@@ -735,9 +863,10 @@ function openDashboardWindow(appOrigin: string): BrowserWindow {
     preload: PRELOAD_PATH,
     theme: chromeTheme,
     backgroundColor: windowBackground(chromeTheme.mode),
-    entryUrl: dashboardEntryUrl(chromeTheme.scheme ?? chromeTheme.mode, appOrigin),
-    appOrigin,
+    entryUrl: entryUrlForTarget(appOrigin),
+    appOrigin: () => dashboardOrigin ?? PACKAGED_APP_ORIGIN,
     onNavigate: openExternal,
+    onLoadFail: (failedUrl, reason) => handleWindowLoadFail(win, failedUrl, reason),
   });
   watchDashboardLifetime(win);
   watchLinuxCaptionState(win);
@@ -752,10 +881,13 @@ function continueInEarlyWindow(early: EarlyWindow, appOrigin: string): void {
     openDashboardWindow(appOrigin);
     return;
   }
-  installDashboardGuards(win, { appOrigin, onNavigate: openExternal });
+  installDashboardGuards(win, {
+    appOrigin: () => dashboardOrigin ?? PACKAGED_APP_ORIGIN,
+    onNavigate: openExternal,
+    onLoadFail: (failedUrl, reason) => handleWindowLoadFail(win, failedUrl, reason),
+  });
   watchDashboardLifetime(win);
-  const chromeTheme = resolveWindowChromeTheme(settingsStore.load().themeBackground);
-  void win.loadURL(dashboardEntryUrl(chromeTheme.scheme ?? chromeTheme.mode, appOrigin));
+  void win.loadURL(entryUrlForTarget(appOrigin));
 }
 
 /**
@@ -821,6 +953,9 @@ function showAboutDialog(version: string): void {
 function runWindowsMenuCommand(win: BrowserWindow, command: WindowsMenuCommandId): void {
   const contents = win.webContents;
   switch (command) {
+    case "connectionSettings":
+      requestOpenConnectionSwitcher(win);
+      return;
     case "close":
       win.close();
       return;
@@ -875,12 +1010,303 @@ function runWindowsMenuCommand(win: BrowserWindow, command: WindowsMenuCommandId
   }
 }
 
-/** Caption menu on Windows and Linux. macOS keeps the system menu bar. */
-function installWindowsAppMenu(version: string): void {
-  if (!usesCaptionOverlay()) return;
-  Menu.setApplicationMenu(
-    Menu.buildFromTemplate(windowsApplicationMenu(app.getLocale(), () => showAboutDialog(version))),
-  );
+/** Install native application menu on macOS and Windows/Linux. */
+function installAppMenu(version: string): void {
+  const handlers: AppMenuHandlers = {
+    onAbout: () => showAboutDialog(version),
+    onConnectionSettings: () => requestOpenConnectionSwitcher(),
+  };
+  if (usesCaptionOverlay()) {
+    Menu.setApplicationMenu(
+      Menu.buildFromTemplate(windowsApplicationMenu(app.getLocale(), handlers)),
+    );
+    return;
+  }
+  if (process.platform === "darwin") {
+    Menu.setApplicationMenu(
+      Menu.buildFromTemplate(macApplicationMenu(app.getLocale(), handlers)),
+    );
+  }
+}
+
+async function stopLocalServices(): Promise<void> {
+  stopDashboardDevServer();
+  const relay = wsRelay;
+  wsRelay = null;
+  if (relay) {
+    await relay.stop().catch(() => undefined);
+  }
+  const sidecar = supervisor;
+  supervisor = null;
+  backendPort = 0;
+  if (sidecar) {
+    await sidecar.stop().catch(() => undefined);
+  }
+}
+
+/**
+ * Prepare the local portable runtime, sidecar, ws relay, and optional dev
+ * server. Returns the local Dashboard origin on success, or null after calling
+ * ``onError`` with a user-facing failure.
+ */
+async function prepareAndStartLocalMode(
+  onError: (failure: ShellFailure) => void,
+): Promise<string | null> {
+  const octopHome = octopHomeDir;
+  const devPortableDir = (process.env.OCTOP_PORTABLE_DIR ?? "").trim();
+  let portableDir = devPortableDir;
+  if (!portableDir) {
+    const installed = installedRuntimeDir(resourcesRoot(), process.platform, existsSync);
+    if (installed) {
+      portableDir = installed;
+      desktopLog().info(`runtime installed at ${installed}`);
+    }
+  }
+
+  if (!portableDir) {
+    portableDir = join(octopHome, "portable");
+    try {
+      const bundled = await readBundledPortable();
+      const local = await readLocalRuntime(octopHome);
+      const decision = classifyRuntime(bundled, local, compareVersions);
+
+      desktopLog().info(
+        `runtime ${decision.action} (${decision.reason}) bundled=${bundled.version} local=${local.version ?? "none"}`,
+      );
+      if (decision.action === "stop") {
+        onError({
+          message: shellT("shell.runtimeTooNew", {
+            localVersion: decision.localVersion,
+            bundledVersion: bundled.version,
+          }),
+          detail: errorDetail(shellT("shell.runtimeDir", { dir: portableDir })),
+        });
+        return null;
+      }
+
+      if (decision.action === "extract" || decision.action === "replace") {
+        const zip = portableZipPath();
+        const digest = await sha256File(zip);
+        if (digest !== bundled.sha256) {
+          desktopLog().error(`portable zip sha256 mismatch file=${zip}`);
+          onError({
+            message: shellT("shell.checksumFailed"),
+            detail: errorDetail(
+              shellT("shell.checksumDetail", { file: zip, expected: bundled.sha256, actual: digest }),
+            ),
+          });
+          return null;
+        }
+        extractPortableZip(zip, portableDir);
+        await writeLocalVersion(octopHome, bundled.version);
+      }
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      desktopLog().error(`portable runtime preparation failed: ${detail}`);
+      onError({
+        message: shellT("shell.portableFailed"),
+        detail: errorDetail(detail),
+      });
+      return null;
+    }
+  }
+
+  const interpreter = join(portableDir, "runtime", process.platform === "win32" ? "python.exe" : "bin/python3");
+  backend = {
+    interpreter,
+    launchScript: join(portableDir, "launch.py"),
+    cwd: portableDir,
+    octopHome,
+    portableDir,
+  };
+
+  if (!deviceSession) {
+    const cipher = safeStorageCipher();
+    await warnIfKeychainUnavailable(cipher);
+    const credentialStore = new DeviceCredentialStore(octopHome, cipher);
+    try {
+      await credentialStore.migrate();
+    } catch (err) {
+      desktopLog().warn(`[desktop] device credential migration failed: ${String(err)}`);
+    }
+    deviceSession = new DeviceSessionClient({
+      store: credentialStore,
+      baseUrl: () => (apiAdmissionClosed || !backendPort ? null : `http://127.0.0.1:${backendPort}`),
+      label: `${process.platform}-${process.arch}`,
+    });
+  }
+
+  registerProtocol(dashboardRoot(portableDir));
+
+  const dashboardDev = app.isPackaged ? null : readDashboardDev(process.env);
+  const windowOrigin = dashboardDev ? dashboardDevOrigin(dashboardDev.port) : WINDOW_ORIGIN;
+  if (!wsRelay) {
+    wsRelay = new WsRelay({
+      backendPort: () => (apiAdmissionClosed || !backendPort ? 0 : backendPort),
+      allowedOrigin: windowOrigin,
+    });
+    try {
+      await wsRelay.start();
+    } catch (err) {
+      desktopLog().warn(`[desktop] websocket relay unavailable: ${errorMessageOf(err)}`);
+      wsRelay = null;
+    }
+  }
+
+  if (!supervisor?.isRunning()) {
+    const ready = await startBackend();
+    if (!ready) {
+      onError({
+        message: shellT("shell.pythonFailed"),
+        detail: errorDetail(
+          backend ? shellT("shell.launcherPort", { script: backend.launchScript, port: backendPort }) : undefined,
+        ),
+      });
+      return null;
+    }
+  }
+
+  if (dashboardDev) {
+    try {
+      desktopLog().info(`[dev] dashboard hot reload at ${windowOrigin}`);
+      await startDashboardDevServer({
+        sourceDir: dashboardDev.sourceDir,
+        port: dashboardDev.port,
+        apiPort: backendPort,
+      });
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      desktopLog().error(`dashboard dev server failed: ${detail}`);
+      onError({
+        message: shellT("shell.devServerFailed"),
+        detail: errorDetail(detail),
+      });
+      return null;
+    }
+  }
+
+  return dashboardDev ? windowOrigin : PACKAGED_APP_ORIGIN;
+}
+
+async function confirmInsecureHttpConnection(
+  win: BrowserWindow | null,
+  url: string,
+): Promise<boolean> {
+  const options = {
+    type: "warning" as const,
+    buttons: [shellT("shell.insecureHttpContinue"), shellT("shell.cancel")],
+    defaultId: 1,
+    cancelId: 1,
+    message: shellT("shell.insecureHttpTitle"),
+    detail: shellT("shell.insecureHttpDetail", { url }),
+    noLink: true,
+  };
+  const { response } = win
+    ? await dialog.showMessageBox(win, options)
+    : await dialog.showMessageBox(options);
+  return response === 0;
+}
+
+async function switchToRemote(
+  rawUrl: string,
+  label?: string,
+  targetWin?: BrowserWindow,
+): Promise<ConnectionState> {
+  const normalizedUrl = normalizeRemoteServerUrl(rawUrl);
+  if (switchingConnection) return currentConnectionState();
+  switchingConnection = true;
+  try {
+    const win =
+      (targetWin && !targetWin.isDestroyed() ? targetWin : null) ??
+      BrowserWindow.getAllWindows().find((w) => !w.isDestroyed()) ??
+      null;
+
+    if (isInsecureRemoteUrl(normalizedUrl)) {
+      const confirmed = await confirmInsecureHttpConnection(win, normalizedUrl);
+      if (!confirmed) {
+        return currentConnectionState();
+      }
+    }
+
+    const current = settingsStore.load();
+    const savedRemoteServers = upsertSavedServer(current.savedRemoteServers, {
+      url: normalizedUrl,
+      label,
+    });
+    settingsStore.save({
+      connectionMode: "remote",
+      remoteServerUrl: normalizedUrl,
+      savedRemoteServers,
+    });
+    activeConnectionMode = "remote";
+    activeRemoteUrl = normalizedUrl;
+    const remoteOrigin = serverOriginOf(normalizedUrl);
+    dashboardOrigin = remoteOrigin;
+
+    await stopLocalServices();
+
+    const nextState = currentConnectionState();
+    broadcastConnectionState(nextState);
+
+    if (win) {
+      installDashboardGuards(win, {
+        appOrigin: () => dashboardOrigin ?? PACKAGED_APP_ORIGIN,
+        onNavigate: openExternal,
+        onLoadFail: (failedUrl, reason) => handleWindowLoadFail(win, failedUrl, reason),
+      });
+      void win.loadURL(entryUrlForTarget(remoteOrigin));
+    } else {
+      openDashboardWindow(remoteOrigin);
+    }
+    return nextState;
+  } finally {
+    switchingConnection = false;
+  }
+}
+
+async function switchToLocal(targetWin?: BrowserWindow): Promise<ConnectionState> {
+  if (switchingConnection) return currentConnectionState();
+  switchingConnection = true;
+  try {
+    settingsStore.save({ connectionMode: "local" });
+    activeConnectionMode = "local";
+    activeRemoteUrl = null;
+    const nextState = currentConnectionState();
+    broadcastConnectionState(nextState);
+
+    const win =
+      (targetWin && !targetWin.isDestroyed() ? targetWin : null) ??
+      BrowserWindow.getAllWindows().find((w) => !w.isDestroyed()) ??
+      null;
+    const chromeTheme = resolveWindowChromeTheme(settingsStore.load().themeBackground);
+    if (win) {
+      void win.loadFile(SPLASH_PATH, {
+        query: { version: appVersion, theme: chromeTheme.mode },
+      });
+    }
+
+    const localOrigin = await prepareAndStartLocalMode((failure) => {
+      if (win && !win.isDestroyed()) {
+        showWindowError(win, failure);
+      }
+    });
+    if (!localOrigin) return nextState;
+
+    dashboardOrigin = localOrigin;
+    if (win && !win.isDestroyed()) {
+      installDashboardGuards(win, {
+        appOrigin: () => dashboardOrigin ?? PACKAGED_APP_ORIGIN,
+        onNavigate: openExternal,
+        onLoadFail: (failedUrl, reason) => handleWindowLoadFail(win, failedUrl, reason),
+      });
+      void win.loadURL(entryUrlForTarget(localOrigin));
+    } else {
+      openDashboardWindow(localOrigin);
+    }
+    return nextState;
+  } finally {
+    switchingConnection = false;
+  }
 }
 
 function readGitStamp(args: readonly string[]): string | null {
@@ -1016,11 +1442,13 @@ async function boot(): Promise<void> {
   }
 
   appVersion = await resolveProductVersion();
-  installWindowsAppMenu(appVersion);
 
   settingsStore = new ClientSettingsStore(defaultClientSettingsPath(app.getPath("userData")));
   const settings = settingsStore.load();
   closeBehavior = settings.closeBehavior;
+  activeConnectionMode = settings.connectionMode;
+  activeRemoteUrl = settings.connectionMode === "remote" ? settings.remoteServerUrl : null;
+  installAppMenu(appVersion);
   const openedHidden = shouldStartHidden({
     platform: process.platform,
     argv: process.argv,
@@ -1053,8 +1481,9 @@ async function boot(): Promise<void> {
   const loginShellEnv =
     process.platform === "win32" ? {} : await readLoginShellEnv(process.env.SHELL);
   const octopHome = resolveOctopHome(process.env, loginShellEnv);
+  octopHomeDir = octopHome;
   installDesktopLog(octopHome);
-  desktopLog().info(`desktop ${appVersion} home=${octopHome}`);
+  desktopLog().info(`desktop ${appVersion} home=${octopHome} mode=${activeConnectionMode}`);
   try {
     syncLoginItem(settings);
   } catch (err) {
@@ -1068,149 +1497,22 @@ async function boot(): Promise<void> {
     if (!early.browserWindow.isDestroyed()) early.browserWindow.show();
   }
 
-  // Local dev escape hatch: point at an already-extracted runtime (e.g. the one
-  // `pnpm dev:runtime` writes to .dev-runtime) and skip bundling/extraction.
-  // Packaged Windows (NSIS → resources/sidecar) and macOS (expanded before
-  // signing → resources/portable) already contain the tree; do not unzip again.
-  const devPortableDir = (process.env.OCTOP_PORTABLE_DIR ?? "").trim();
-  let portableDir = devPortableDir;
-  if (!portableDir) {
-    const installed = installedRuntimeDir(resourcesRoot(), process.platform, existsSync);
-    if (installed) {
-      portableDir = installed;
-      desktopLog().info(`runtime installed at ${installed}`);
-    }
-  }
-
-  // A package that still ships only the zip (not the Win/mac/Linux installers):
-  // version guard (§2.3) then atomic extract into OCTOP_HOME. Must run BEFORE spawning Python.
-  if (!portableDir) {
-    portableDir = join(octopHome, "portable");
-    try {
-      const bundled = await readBundledPortable();
-      const local = await readLocalRuntime(octopHome);
-      const decision = classifyRuntime(bundled, local, compareVersions);
-
-      desktopLog().info(
-        `runtime ${decision.action} (${decision.reason}) bundled=${bundled.version} local=${local.version ?? "none"}`,
-      );
-      if (decision.action === "stop") {
-        early.showError({
-          message: shellT("shell.runtimeTooNew", {
-            localVersion: decision.localVersion,
-            bundledVersion: bundled.version,
-          }),
-          detail: errorDetail(shellT("shell.runtimeDir", { dir: portableDir })),
-        });
-        return;
-      }
-
-      if (decision.action === "extract" || decision.action === "replace") {
-        const zip = portableZipPath();
-        const digest = await sha256File(zip);
-        if (digest !== bundled.sha256) {
-          desktopLog().error(`portable zip sha256 mismatch file=${zip}`);
-          early.showError({
-            message: shellT("shell.checksumFailed"),
-            detail: errorDetail(
-              shellT("shell.checksumDetail", { file: zip, expected: bundled.sha256, actual: digest }),
-            ),
-          });
-          return;
-        }
-        extractPortableZip(zip, portableDir);
-        await writeLocalVersion(octopHome, bundled.version);
-      }
-    } catch (err) {
-      const detail = err instanceof Error ? err.message : String(err);
-      desktopLog().error(`portable runtime preparation failed: ${detail}`);
-      early.showError({
-        message: shellT("shell.portableFailed"),
-        detail: errorDetail(detail),
-      });
-      return;
-    }
-  }
-
-  const interpreter = join(portableDir, "runtime", process.platform === "win32" ? "python.exe" : "bin/python3");
-  backend = {
-    interpreter,
-    launchScript: join(portableDir, "launch.py"),
-    cwd: portableDir,
-    octopHome,
-    portableDir,
-  };
-
-  // §7 accounts: the device credential lives in the data root, next to the
-  // database it unlocks, and only the main process ever sees it.
-  const cipher = safeStorageCipher();
-  await warnIfKeychainUnavailable(cipher);
-  const credentialStore = new DeviceCredentialStore(octopHome, cipher);
-  try {
-    // v1 could leave a plaintext credential behind; this is the only place that
-    // adopts it — re-encrypting when a keychain exists, deleting it otherwise.
-    await credentialStore.migrate();
-  } catch (err) {
-    desktopLog().warn(`[desktop] device credential migration failed: ${String(err)}`);
-  }
-  deviceSession = new DeviceSessionClient({
-    store: credentialStore,
-    baseUrl: () => (apiAdmissionClosed || !backendPort ? null : `http://127.0.0.1:${backendPort}`),
-    label: `${process.platform}-${process.arch}`,
-  });
-
-  registerProtocol(dashboardRoot(portableDir));
   registerIpcHandlers();
 
-  // §5.2: the page learns only this relay's ephemeral port, never the sidecar's.
-  // A bind failure must not abort the launch — the Dashboard then finds no
-  // endpoint and falls back to its page-origin URLs, i.e. no live streams.
-  const dashboardDev = app.isPackaged ? null : readDashboardDev(process.env);
-  const windowOrigin = dashboardDev ? dashboardDevOrigin(dashboardDev.port) : WINDOW_ORIGIN;
-  wsRelay = new WsRelay({
-    backendPort: () => (apiAdmissionClosed || !backendPort ? 0 : backendPort),
-    allowedOrigin: windowOrigin,
-  });
-  try {
-    await wsRelay.start();
-  } catch (err) {
-    desktopLog().warn(`[desktop] websocket relay unavailable: ${errorMessageOf(err)}`);
-    wsRelay = null;
-  }
-
-  const ready = await startBackend();
-  if (!ready) {
-    early.showError({
-      message: shellT("shell.pythonFailed"),
-      detail: errorDetail(
-        backend ? shellT("shell.launcherPort", { script: backend.launchScript, port: backendPort }) : undefined,
-      ),
-    });
+  // Thin-client remote mode: skip local Python sidecar & wsRelay completely
+  // and connect directly to the remote Octop Server.
+  if (activeConnectionMode === "remote" && activeRemoteUrl) {
+    const remoteOrigin = serverOriginOf(activeRemoteUrl);
+    desktopLog().info(`thin-client mode: connecting to ${activeRemoteUrl}`);
+    continueInEarlyWindow(early, remoteOrigin);
     return;
   }
 
-  if (dashboardDev) {
-    try {
-      desktopLog().info(`[dev] dashboard hot reload at ${windowOrigin}`);
-      await startDashboardDevServer({
-        sourceDir: dashboardDev.sourceDir,
-        port: dashboardDev.port,
-        apiPort: backendPort,
-      });
-    } catch (err) {
-      const detail = err instanceof Error ? err.message : String(err);
-      desktopLog().error(`dashboard dev server failed: ${detail}`);
-      early.showError({
-        message: shellT("shell.devServerFailed"),
-        detail: errorDetail(detail),
-      });
-      return;
-    }
-  }
+  const appOrigin = await prepareAndStartLocalMode((failure) => early.showError(failure));
+  if (!appOrigin) return;
 
   // Stay in the splash window. Closing it and opening another one is the
   // flash the user sees when "正在准备本地服务" finishes.
-  const appOrigin = dashboardDev ? windowOrigin : PACKAGED_APP_ORIGIN;
   continueInEarlyWindow(early, appOrigin);
 }
 

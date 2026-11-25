@@ -8,6 +8,7 @@ import {
   windowChrome,
   type WindowChromeTheme,
 } from "./chrome";
+import { installFullscreenForwarding } from "./main-window";
 import { DEFAULT_WINDOW_SIZE, MIN_WINDOW_SIZE } from "./size";
 
 /**
@@ -73,6 +74,7 @@ export function createEarlyWindow(options: EarlyWindowOptions): EarlyWindow {
   });
   // Before the first paint: the splash is a loading page and draws no menu.
   concealWindowsMenuBar(win);
+  installFullscreenForwarding(win);
   win.once("ready-to-show", () => {
     concealWindowsMenuBar(win);
     if (options.showWhenReady !== false) win.show();

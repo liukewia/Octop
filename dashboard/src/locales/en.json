@@ -4378,11 +4378,11 @@
       "upgradeButton": "Upgrade Now",
       "later": "Later",
       "shellConfirmTitle": "New version {{version}}",
-      "shellConfirmBody": "You are on {{current}}. The download progress stays on this page. When it finishes, the system installer opens. Drag Octop to Applications. Your database, workspace, and settings are kept.",
+      "shellConfirmBody": "You are on {{current}}. The download progress stays on this page. When it finishes, the system installer opens so you can complete the upgrade. Your database, workspace, and settings are kept.",
       "shellDownloading": "Downloading {{percent}}%",
       "shellDownloadingUnknown": "Downloading…",
       "shellOpening": "Opening the installer…",
-      "shellOpened": "The installer is open. Drag Octop to Applications, then open it from there.",
+      "shellOpened": "The installer is open. Follow the installer prompts to finish upgrading, then reopen Octop.",
       "shellOpenAgain": "Open the installer again",
       "checking": "Checking...",
       "upgrading": "Upgrading...",
@@ -8377,5 +8377,21 @@
     "allowAdminHint": "Allow the cloud to mark accounts as administrator. When off, every cloud account uses the default member role.",
     "syncPermissionsHint": "Overwrite local permissions with the cloud list on each sign-in. When off, only the role is synced.",
     "footerHint": "Read-only locally: a cloud account's password, role, and permissions cannot be changed here."
+  },
+  "desktopConnection": {
+    "modalTitle": "Connection Settings",
+    "modalHint": "Switch between Local and remote Octop servers. Remote mode runs as a thin client and stops the local backend.",
+    "existingConnections": "Connections",
+    "localMode": "Local",
+    "localDesc": "Use local Octop backend service",
+    "addConnection": "Add Remote Connection",
+    "removeServer": "Remove connection",
+    "urlLabel": "Server URL",
+    "labelLabel": "Label (optional)",
+    "labelPlaceholder": "e.g. Production / Team Server",
+    "connectButton": "Add & Connect",
+    "urlRequired": "Please enter a remote server URL",
+    "invalidUrl": "Invalid server URL. Use http:// or https://",
+    "switchFailed": "Failed to switch connection"
   }
 }

@@ -4,6 +4,29 @@
  * Dashboard falls back to its existing Python self-update flow.
  */
 
+export type DesktopConnectionMode = "local" | "remote";
+
+export interface DesktopRemoteServerEntry {
+  url: string;
+  label: string;
+  lastUsedAt?: number;
+}
+
+export interface DesktopConnectionState {
+  mode: DesktopConnectionMode;
+  remoteUrl: string | null;
+  savedServers: DesktopRemoteServerEntry[];
+}
+
+export interface DesktopConnectionBridge {
+  get(): Promise<DesktopConnectionState>;
+  switchToLocal(): Promise<DesktopConnectionState>;
+  switchToRemote(url: string, label?: string): Promise<DesktopConnectionState>;
+  removeSaved(url: string): Promise<DesktopConnectionState>;
+  onChange(callback: (state: DesktopConnectionState) => void): () => void;
+  onOpenSwitcher(callback: () => void): () => void;
+}
+
 export interface DesktopClientSettings {
   launchAtLogin: boolean;
   /** Login-item launches stay hidden until the Dock or tray opens the window. */
@@ -11,6 +34,9 @@ export interface DesktopClientSettings {
   closeBehavior: "quit" | "tray";
   themeBackground: "system" | "light" | "dark";
   stableOnly: boolean;
+  connectionMode?: DesktopConnectionMode;
+  remoteServerUrl?: string | null;
+  savedRemoteServers?: DesktopRemoteServerEntry[];
 }
 
 export interface DesktopUpdateCheckResult {
@@ -53,6 +79,7 @@ export interface WindowsMenuCommand {
   id: string;
   label: string;
   accelerator: string | null;
+  checked?: boolean;
 }
 
 export interface WindowsMenuSeparator {
@@ -86,6 +113,7 @@ export interface DesktopSessionBridge {
 
 export interface OctopDesktopBridge {
   session?: DesktopSessionBridge;
+  connection?: DesktopConnectionBridge;
   /**
    * Where to dial WebSockets (§5.2). Absent on an older shell, and null when the
    * relay could not bind — both mean "derive the address from the page origin".

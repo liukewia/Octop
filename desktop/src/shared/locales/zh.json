@@ -5,6 +5,7 @@
   "error": {
     "title": "Octop 无法启动",
     "retry": "重试启动",
+    "switchToLocal": "切回本地",
     "quit": "退出应用",
     "details": "技术详情",
     "copy": "复制错误信息",
@@ -34,6 +35,22 @@
     "updateCheckFailed": "检查更新失败",
     "upToDateTitle": "已是最新版本",
     "upToDate": "当前版本 {{version}}。",
-    "updateFailed": "升级失败"
+    "updateFailed": "升级失败",
+    "remoteLoadFailed": "无法连接到远端服务器 {{url}}。",
+    "remoteLoadFailedDetail": "原因：{{reason}}\n\n可点击「切回本地」或通过左上角菜单「连接设置」切换连接。",
+    "insecureHttpTitle": "确认使用未加密的 HTTP 连接？",
+    "insecureHttpDetail": "即将通过 HTTP（明文）连接到 {{url}}。\n\n风险提示：HTTP 不会加密网络传输，你的登录密码、会话令牌以及对话内容可能被同一网络或链路上的第三方窃听或篡改。如非受信任的内网环境，建议改用 HTTPS。",
+    "insecureHttpContinue": "仍要使用 HTTP 连接",
+    "cancel": "取消"
+  },
+  "update": {
+    "unsupportedPackage": "不支持的安装包类型：{{ext}}",
+    "untrustedUrl": "安装包地址不在允许的下载主机范围内。",
+    "verifyFailed": "安装包校验失败，已取消安装。",
+    "uncleanExit": "Python 后端未能在宽限期内干净退出（退出码 {{code}}），已取消安装。",
+    "exitCodeNone": "无",
+    "downloadRedirectBlocked": "下载失败：重定向地址不在允许范围内",
+    "downloadHttpError": "下载失败：HTTP {{status}}",
+    "downloadEmptyBody": "下载失败：响应没有内容"
   }
 }

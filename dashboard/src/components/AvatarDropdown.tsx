@@ -2,6 +2,7 @@ import {
   useState,
   useCallback,
   useEffect,
+  useRef,
   type ReactNode,
   type SyntheticEvent,
 } from "react";
@@ -188,6 +189,17 @@ export default function AvatarDropdown({
     ssoRows.push({ kind, display_name: "" });
   }
 
+  const ssoPopupTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (ssoPopupTimerRef.current !== null) {
+        window.clearInterval(ssoPopupTimerRef.current);
+        ssoPopupTimerRef.current = null;
+      }
+    };
+  }, []);
+
   const handleBindOauth = async (kind: string) => {
     const popup = openSsoPopup();
     setSsoBindingKind(kind);
@@ -195,12 +207,19 @@ export default function AvatarDropdown({
       const { authorization_url } = await authApi.startOauthBind(kind, "/chat");
       if (popup && !popup.closed) {
         popup.location.href = authorization_url;
+        if (ssoPopupTimerRef.current !== null) {
+          window.clearInterval(ssoPopupTimerRef.current);
+        }
         const timer = window.setInterval(() => {
           if (!popup || popup.closed) {
             window.clearInterval(timer);
+            if (ssoPopupTimerRef.current === timer) {
+              ssoPopupTimerRef.current = null;
+            }
             setSsoBindingKind(null);
           }
         }, 400);
+        ssoPopupTimerRef.current = timer;
       } else {
         popup?.close();
         message.error(t("account.ssoPopupBlocked"));

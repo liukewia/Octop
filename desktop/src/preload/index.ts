@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 import {
   IPC_CHANNELS,
   type ClientSettings,
+  type ConnectionState,
   type IssuedSession,
   type PlatformInfo,
   type UpdateActivity,
@@ -77,7 +78,12 @@ const bridge = {
   windowsMenu: {
     model(): Promise<{
       titles: string[];
-      menus: Array<Array<{ kind: "separator" } | { kind: "command"; id: string; label: string; accelerator: string | null }>>;
+      menus: Array<
+        Array<
+          | { kind: "separator" }
+          | { kind: "command"; id: string; label: string; accelerator: string | null; checked?: boolean }
+        >
+      >;
     } | null> {
       return ipcRenderer.invoke(IPC_CHANNELS.windowsMenuModel);
     },
@@ -138,6 +144,29 @@ const bridge = {
     },
     revoke(accessToken: string): Promise<boolean> {
       return ipcRenderer.invoke(IPC_CHANNELS.sessionRevoke, accessToken);
+    },
+  },
+  /**
+   * Local C/S vs. remote thin-client server switching.
+   */
+  connection: {
+    get(): Promise<ConnectionState> {
+      return ipcRenderer.invoke(IPC_CHANNELS.connectionGet);
+    },
+    switchToLocal(): Promise<ConnectionState> {
+      return ipcRenderer.invoke(IPC_CHANNELS.connectionSwitchLocal);
+    },
+    switchToRemote(url: string, label?: string): Promise<ConnectionState> {
+      return ipcRenderer.invoke(IPC_CHANNELS.connectionSwitchRemote, { url, label });
+    },
+    removeSaved(url: string): Promise<ConnectionState> {
+      return ipcRenderer.invoke(IPC_CHANNELS.connectionRemoveSaved, url);
+    },
+    onChange(callback: (state: ConnectionState) => void): () => void {
+      return subscribe(IPC_CHANNELS.connectionChanged, callback);
+    },
+    onOpenSwitcher(callback: () => void): () => void {
+      return subscribe(IPC_CHANNELS.connectionOpenSwitcher, () => callback());
     },
   },
 } as const;

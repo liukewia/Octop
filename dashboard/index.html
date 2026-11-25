@@ -146,14 +146,7 @@
           max(24px, env(safe-area-inset-bottom, 0px))
           max(24px, env(safe-area-inset-left, 0px));
         margin: 0;
-        /* Same composition as the shell's own splash: a soft brand wash gives
-           the empty page a shape instead of a spinner floating in a void. */
-        background: radial-gradient(
-            720px 380px at 50% -8%,
-            rgba(232, 93, 117, 0.11),
-            transparent 68%
-          ),
-          #f5f6f8;
+        background: #f5f6f8;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
           "Noto Sans SC", sans-serif;
         color: #4b5563;
@@ -165,12 +158,7 @@
         background: #0e0e0e;
       }
       html[data-theme="dark"] #octop-boot {
-        background: radial-gradient(
-            720px 380px at 50% -8%,
-            rgba(240, 139, 154, 0.1),
-            transparent 68%
-          ),
-          #0e0e0e;
+        background: #0e0e0e;
         color: rgba(255, 255, 255, 0.6);
       }
       .octop-boot-stack {
@@ -179,29 +167,12 @@
         align-items: center;
         animation: octop-boot-in 420ms ease-out both;
       }
-      /* Horizontal lockup: dark wordmark on light, white on dark. */
-      .octop-boot-logo {
-        display: block;
-        height: 72px;
-        width: auto;
-        max-width: min(260px, 75vw);
-        object-fit: contain;
-      }
-      .octop-boot-logo-dark {
-        display: none;
-      }
-      html[data-theme="dark"] .octop-boot-logo-light {
-        display: none;
-      }
-      html[data-theme="dark"] .octop-boot-logo-dark {
-        display: block;
-      }
-      /* Arc + status: same composition as BrandLoading / shell splash. */
+      /* Arc + status: non-shell loading omits the glow and brand logo. */
       .octop-boot-status {
         display: flex;
         align-items: center;
         gap: 12px;
-        margin: 24px 0 0;
+        margin: 0;
         font-size: 16px;
         font-weight: 500;
         line-height: 1;
@@ -367,18 +338,6 @@
       <div id="root">
         <div id="octop-boot" role="status" aria-live="polite">
           <div class="octop-boot-stack">
-            <img
-              class="octop-boot-logo octop-boot-logo-light"
-              src="%BASE_URL%logo_horizontal_dark.png"
-              alt="Octop"
-              height="72"
-            />
-            <img
-              class="octop-boot-logo octop-boot-logo-dark"
-              src="%BASE_URL%logo_horizontal_white.png"
-              alt="Octop"
-              height="72"
-            />
             <p class="octop-boot-status">
               <span class="octop-boot-spinner" aria-hidden="true">
                 <span class="octop-boot-spinner-track"></span>

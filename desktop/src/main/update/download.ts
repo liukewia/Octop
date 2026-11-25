@@ -9,6 +9,8 @@ import { rm } from "node:fs/promises";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
+import { shellT } from "../../shared/shell-i18n";
+
 /** Minimal shape of Electron's ``net.fetch`` / Node's global ``fetch``. */
 export type FetchLike = (
   url: string,
@@ -30,10 +32,10 @@ export async function downloadToFile(
 ): Promise<void> {
   const res = await fetchImpl(url, { cache: "no-store" });
   if (options.validateFinalUrl && res.url && !options.validateFinalUrl(res.url)) {
-    throw new Error("下载失败：重定向地址不在允许范围内");
+    throw new Error(shellT("update.downloadRedirectBlocked"));
   }
-  if (!res.ok) throw new Error(`下载失败：HTTP ${res.status}`);
-  if (!res.body) throw new Error("下载失败：响应没有内容");
+  if (!res.ok) throw new Error(shellT("update.downloadHttpError", { status: res.status }));
+  if (!res.body) throw new Error(shellT("update.downloadEmptyBody"));
 
   const total = Number(res.headers.get("content-length") ?? 0) || 0;
   let received = 0;

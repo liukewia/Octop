@@ -4378,12 +4378,12 @@
       "upgradeButton": "立即升级",
       "later": "稍后",
       "shellConfirmTitle": "发现新版本 {{version}}",
-      "shellConfirmBody": "当前版本 {{current}}。确认后在此页下载。下载完成会直接打开系统安装窗口，把 Octop 拖进「应用程序」即可。数据库、工作区和配置都会保留。",
+      "shellConfirmBody": "当前版本 {{current}}。确认后在此页下载。下载完成会直接打开系统安装程序以完成升级。数据库、工作区和配置都会保留。",
       "shellDownloading": "正在下载 {{percent}}%",
       "shellDownloadingUnknown": "正在下载…",
-      "shellOpening": "正在打开安装盘…",
-      "shellOpened": "安装盘已打开。把 Octop 拖到「应用程序」，然后从那里重新打开。",
-      "shellOpenAgain": "再次打开安装盘",
+      "shellOpening": "正在打开安装程序…",
+      "shellOpened": "安装程序已打开，请按提示完成升级后重新打开 Octop。",
+      "shellOpenAgain": "再次打开安装程序",
       "checking": "正在检查...",
       "upgrading": "正在升级...",
       "alreadyLatest": "已是最新版本。",
@@ -8377,5 +8377,21 @@
     "allowAdminHint": "允许云端把账号标记为管理员；关闭后所有云端账号都使用默认成员角色。",
     "syncPermissionsHint": "每次登录都用云端返回的权限覆盖本地；关闭后只同步角色。",
     "footerHint": "本地只读：云端账号的密码、角色与权限不能在本地修改。"
+  },
+  "desktopConnection": {
+    "modalTitle": "连接设置",
+    "modalHint": "切换本地或远端 Octop 服务；连接远端时将作为瘦客户端直连，暂停本地后端。",
+    "existingConnections": "已有连接",
+    "localMode": "本地",
+    "localDesc": "使用本机 Octop 后端服务",
+    "addConnection": "新增远端连接",
+    "removeServer": "移除连接",
+    "urlLabel": "服务器地址",
+    "labelLabel": "备注名称（可选）",
+    "labelPlaceholder": "例如：公司集群 / 测试服",
+    "connectButton": "添加并连接",
+    "urlRequired": "请填写远端服务器地址",
+    "invalidUrl": "服务器地址格式无效，请使用 http:// 或 https://",
+    "switchFailed": "切换连接失败"
   }
 }

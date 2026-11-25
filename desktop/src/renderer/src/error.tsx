@@ -68,8 +68,26 @@ function ErrorPage() {
     [],
   );
   const [copyState, setCopyState] = useState<CopyState>("idle");
+  const [remoteUrl, setRemoteUrl] = useState<string | null>(null);
   /** Absent when the page is opened outside the shell (no preload bridge). */
   const canRetry = typeof window.octopShell?.restart === "function";
+  const connectionBridge = window.octopDesktop?.connection;
+
+  useEffect(() => {
+    if (!connectionBridge) return;
+    let cancelled = false;
+    void connectionBridge
+      .get()
+      .then((state) => {
+        if (!cancelled && state.mode === "remote" && state.remoteUrl) {
+          setRemoteUrl(state.remoteUrl);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [connectionBridge]);
 
   useEffect(() => {
     if (copyState === "idle") return;
@@ -101,6 +119,9 @@ function ErrorPage() {
   };
 
   const handleRetry = () => window.octopShell?.restart();
+  const handleSwitchLocal = () => {
+    void connectionBridge?.switchToLocal();
+  };
 
   return (
     <main className={styles.result}>
@@ -111,12 +132,24 @@ function ErrorPage() {
         <p className={styles.message}>{message}</p>
 
         <div className={styles.actions}>
-          {canRetry ? (
+          {remoteUrl && connectionBridge ? (
             <button
               type="button"
               className={`${styles.button} ${styles.buttonPrimary}`}
-              onClick={handleRetry}
+              onClick={handleSwitchLocal}
               autoFocus
+            >
+              {t("error.switchToLocal")}
+            </button>
+          ) : null}
+          {canRetry ? (
+            <button
+              type="button"
+              className={
+                remoteUrl ? styles.button : `${styles.button} ${styles.buttonPrimary}`
+              }
+              onClick={handleRetry}
+              autoFocus={!remoteUrl}
             >
               {t("error.retry")}
             </button>
@@ -125,7 +158,7 @@ function ErrorPage() {
             type="button"
             className={styles.button}
             onClick={() => window.close()}
-            autoFocus={!canRetry}
+            autoFocus={!canRetry && !remoteUrl}
           >
             {t("error.quit")}
           </button>

@@ -3,6 +3,25 @@
  * typed ``window.octopDesktop`` bridge; raw ``ipcRenderer`` is never exposed.
  */
 
+export type ConnectionMode = "local" | "remote";
+
+export interface RemoteServerEntry {
+  /** Normalized remote Octop server URL (origin + optional base path). */
+  url: string;
+  /** Human-readable name shown in menus; defaults to host. */
+  label: string;
+  /** Epoch ms when this server was last selected. */
+  lastUsedAt?: number;
+}
+
+export interface ConnectionState {
+  mode: ConnectionMode;
+  /** Active remote server URL when mode === "remote", otherwise null. */
+  remoteUrl: string | null;
+  /** Recently used / saved remote servers, newest first. */
+  savedServers: RemoteServerEntry[];
+}
+
 export interface ClientSettings {
   /** Launch at login / open at login. */
   launchAtLogin: boolean;
@@ -20,6 +39,12 @@ export interface ClientSettings {
   themeBackground: "system" | "light" | "dark";
   /** Whether the shell update check should follow the stable channel only. */
   stableOnly: boolean;
+  /** Local C/S sidecar mode vs. remote thin-client mode. */
+  connectionMode: ConnectionMode;
+  /** Active remote server URL when connectionMode === "remote". */
+  remoteServerUrl: string | null;
+  /** Saved remote server bookmarks for quick switching. */
+  savedRemoteServers: RemoteServerEntry[];
 }
 
 export interface PlatformInfo {
@@ -100,4 +125,10 @@ export const IPC_CHANNELS = {
   sessionRegister: "octop:session:register",
   sessionRenew: "octop:session:renew",
   sessionRevoke: "octop:session:revoke",
+  connectionGet: "octop:connection:get",
+  connectionSwitchLocal: "octop:connection:switch-local",
+  connectionSwitchRemote: "octop:connection:switch-remote",
+  connectionRemoveSaved: "octop:connection:remove-saved",
+  connectionChanged: "octop:connection:changed",
+  connectionOpenSwitcher: "octop:connection:open-switcher",
 } as const;

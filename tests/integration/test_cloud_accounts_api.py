@@ -274,3 +274,178 @@ async def _member_token(client: Any, auth: dict[str, str]) -> str:
     )
     login.raise_for_status()
     return login.json()["access_token"]
+
+
+async def test_offline_grace_zero_caps_local_ttl_to_cloud_token(env: Any) -> None:
+    """offline_grace_seconds=0 must not mint a local JWT that outlives the cloud token."""
+    client, _srv, auth = env
+    cfg = {**CONFIG_BODY, "offline_grace_seconds": 0}
+    saved = await client.put("/api/admin/cloud-account", json=cfg, headers=auth)
+    assert saved.status_code == 200
+    assert saved.json()["offline_grace_seconds"] == 0
+
+    signed_in = await client.post(
+        "/api/auth/cloud/login", json={"username": "alice", "password": "pw"}
+    )
+    assert signed_in.status_code == 200
+    assert signed_in.json()["expires_in"] <= 3600
+
+
+async def test_auto_provision_false_rejects_unknown_cloud_user(env: Any) -> None:
+    """When auto_provision is off, an unprojected cloud account cannot sign in."""
+    client, _srv, auth = env
+    cfg = {**CONFIG_BODY, "auto_provision": False}
+    saved = await client.put("/api/admin/cloud-account", json=cfg, headers=auth)
+    assert saved.status_code == 200
+
+    res = await client.post(
+        "/api/auth/cloud/login", json={"username": "alice", "password": "pw"}
+    )
+    assert res.status_code in (401, 403)
+    listed = await client.get("/api/users", headers=auth)
+    assert all(row["username"] != "alice" for row in listed.json())
+
+
+async def test_cloud_client_preserves_base_url_path_prefix() -> None:
+    """Gateway path prefixes on base_url must survive relative endpoint joins."""
+    from octop.infra.auth.cloud.client import CloudClient
+    from octop.infra.auth.cloud.config import CloudAccountConfig
+
+    seen_urls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen_urls.append(str(request.url))
+        return httpx.Response(200, json={"service": "octop-cloud", "version": "1.0.0"})
+
+    cfg = CloudAccountConfig(
+        enabled=True,
+        display_name="Cloud",
+        base_url="https://cloud.example.com/gateway/auth",
+        client_id="cid",
+        client_secret="sec",
+    )
+    client = CloudClient(cfg, transport=httpx.MockTransport(handler))
+    probe = await client.probe()
+    assert probe["service"] == "octop-cloud"
+    assert seen_urls == ["https://cloud.example.com/gateway/auth/api/v1/health"]
+
+
+def test_normalize_base_url_rejects_embedded_credentials() -> None:
+    from octop.infra.auth.cloud.config import CloudConfigError, normalize_base_url
+
+    with pytest.raises(CloudConfigError, match="credentials"):
+        normalize_base_url("https://user:pass@cloud.example.com")
+    with pytest.raises(CloudConfigError, match="credentials"):
+        normalize_base_url("https://user@cloud.example.com")
+    assert (
+        normalize_base_url("https://cloud.example.com/prefix/")
+        == "https://cloud.example.com/prefix"
+    )
+
+
+async def test_allocate_cloud_username_rejects_dot_segments(env: Any) -> None:
+    """Cloud usernames like '..' or '.' must be sanitized to safe path segments."""
+    _client, srv, _auth = env
+    mgr = srv.app_runtime.user_manager
+    for idx, bad in enumerate((".", "..", "../etc")):
+        allocated = mgr._allocate_cloud_username(
+            bad, "https://cloud.example.com", f"sub-{idx}"
+        )
+        assert allocated not in (".", "..")
+        assert "/" not in allocated and "\\" not in allocated
+
+
+async def test_cookie_only_cloud_refresh_and_logout_no_sliding_renewal(
+    env: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Browser sessions can refresh with only the HttpOnly cookie, and logout never re-sets it."""
+    from octop.api.common.session_cookie import SESSION_COOKIE
+    from octop.api.middleware import jwt_auth
+
+    client, _srv, auth = env
+    await client.put("/api/admin/cloud-account", json=CONFIG_BODY, headers=auth)
+
+    browser = httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=client._octop_app),  # type: ignore[attr-defined]
+        base_url="http://testserver",
+    )
+    async with browser:
+        login = await browser.post(
+            "/api/auth/cloud/login", json={"username": "alice", "password": "pw"}
+        )
+        assert login.status_code == 200
+        assert SESSION_COOKIE in browser.cookies
+
+        # Cookie-only refresh: no Authorization header, no JSON access_token.
+        refreshed = await browser.post("/api/auth/cloud/refresh")
+        assert refreshed.status_code == 200
+        assert refreshed.json()["access_token"]
+
+        # Simulate sliding-renewal window firing during /api/auth/cloud/logout.
+        monkeypatch.setattr(jwt_auth, "maybe_sliding_renew_token", lambda *_a, **_kw: "renewed.jwt.tok")
+        logout = await browser.post("/api/auth/cloud/logout")
+        assert logout.status_code == 204
+        assert "x-octop-access-token" not in {k.lower() for k in logout.headers}
+        set_cookies = logout.headers.get_list("set-cookie")
+        assert all("renewed.jwt.tok" not in sc for sc in set_cookies)
+
+
+def test_cloud_session_locks_use_weak_references(env: Any) -> None:
+    """Session locks must not accumulate indefinitely in memory."""
+    import gc
+
+    _client, srv, _auth = env
+    svc = cloud_service.CloudAccountService(srv.services, srv.app_runtime.user_manager)
+    lock = svc._session_lock("ephemeral-session-id")
+    assert "ephemeral-session-id" in svc._session_locks
+    del lock
+    gc.collect()
+    assert "ephemeral-session-id" not in svc._session_locks
+
+
+def test_websocket_cookie_origin_allowed_matrix() -> None:
+    """Cookie-authenticated WebSockets allow same-origin or configured CORS origins only."""
+    from types import SimpleNamespace
+
+    from octop.api.common.session_cookie import websocket_cookie_origin_allowed
+
+    def fake_ws(origin: str | None, host: str = "127.0.0.1:8000") -> Any:
+        headers: dict[str, str] = {"host": host}
+        if origin is not None:
+            headers["origin"] = origin
+        return SimpleNamespace(headers=headers)
+
+    server = SimpleNamespace(
+        services=SimpleNamespace(
+            config=SimpleNamespace(cors_origins=["https://app.example.com/"])
+        )
+    )
+
+    assert websocket_cookie_origin_allowed(fake_ws("http://127.0.0.1:8000"), server) is True
+    assert websocket_cookie_origin_allowed(fake_ws("https://app.example.com"), server) is True
+    assert websocket_cookie_origin_allowed(fake_ws("http://127.0.0.1:9999"), server) is False
+    assert websocket_cookie_origin_allowed(fake_ws("https://evil.example.com"), server) is False
+    assert websocket_cookie_origin_allowed(fake_ws(None), server) is False
+    assert websocket_cookie_origin_allowed(fake_ws("file:///etc/passwd"), server) is False
+
+
+async def test_cookie_ws_rejects_cross_origin(env: Any) -> None:
+    """A cookie-authenticated WebSocket with a foreign Origin closes with 4003."""
+    from starlette.testclient import TestClient
+    from starlette.websockets import WebSocketDisconnect
+
+    from octop.api.common.session_cookie import SESSION_COOKIE
+
+    client, _srv, auth = env
+    token = await _member_token(client, auth)
+    with TestClient(client._octop_app) as sync_client:  # type: ignore[attr-defined]
+        sync_client.cookies.set(SESSION_COOKIE, token)
+        with (
+            pytest.raises(WebSocketDisconnect) as exc_info,
+            sync_client.websocket_connect(
+                "/api/notifications/ws",
+                headers={"origin": "https://evil.example.com"},
+            ) as ws,
+        ):
+            ws.receive_text()
+        assert exc_info.value.code == 4003

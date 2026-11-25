@@ -16,23 +16,16 @@ import { DEFAULT_WINDOW_SIZE, MIN_WINDOW_SIZE } from "./size";
  * the page hot-reloads. Sandbox flags stay the same either way (§5.3).
  */
 
-/** In-app navigation and fullscreen signals. Safe to call on the splash window before it loads the Dashboard. */
-export function installDashboardGuards(
-  win: BrowserWindow,
-  options: { appOrigin: string; onNavigate: (url: string) => void },
-): void {
-  // External navigation is intercepted and opened by the OS, never in-app (§5.2).
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    options.onNavigate(url);
-    return { action: "deny" };
-  });
-  win.webContents.on("will-navigate", (event, url) => {
-    if (!isAppNavigation(url, options.appOrigin)) {
-      event.preventDefault();
-      options.onNavigate(url);
-    }
-  });
+const fullscreenForwardingInstalled = new WeakSet<BrowserWindow>();
 
+/**
+ * Forward fullscreen transitions to the renderer and toggle the Windows caption
+ * overlay. Idempotent per window so both the early splash/error window and the
+ * Dashboard lifecycle can safely install it.
+ */
+export function installFullscreenForwarding(win: BrowserWindow): void {
+  if (fullscreenForwardingInstalled.has(win)) return;
+  fullscreenForwardingInstalled.add(win);
   // Fullscreen hides the native buttons (traffic lights / caption overlay).
   // The page keeps its menu row and drops the space those buttons occupied.
   const sendFullscreen = (fullscreen: boolean) => {
@@ -49,6 +42,49 @@ export function installDashboardGuards(
   });
 }
 
+const dashboardGuardsInstalled = new WeakSet<BrowserWindow>();
+
+/** In-app navigation and fullscreen signals. Safe to call on the splash window before it loads the Dashboard. */
+export function installDashboardGuards(
+  win: BrowserWindow,
+  options: {
+    appOrigin: string | (() => string);
+    onNavigate: (url: string) => void;
+    onLoadFail?: (url: string, errorDescription: string) => void;
+  },
+): void {
+  const resolveOrigin = () =>
+    typeof options.appOrigin === "function" ? options.appOrigin() : options.appOrigin;
+
+  if (!dashboardGuardsInstalled.has(win)) {
+    dashboardGuardsInstalled.add(win);
+    // External navigation is intercepted and opened by the OS, never in-app (§5.2).
+    win.webContents.setWindowOpenHandler(({ url }) => {
+      options.onNavigate(url);
+      return { action: "deny" };
+    });
+    win.webContents.on("will-navigate", (event, url) => {
+      if (url.startsWith("file://")) return;
+      if (!isAppNavigation(url, resolveOrigin())) {
+        event.preventDefault();
+        options.onNavigate(url);
+      }
+    });
+    if (options.onLoadFail) {
+      win.webContents.on(
+        "did-fail-load",
+        (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+          // -3 is ERR_ABORTED (normal when switching URLs rapidly).
+          if (!isMainFrame || errorCode === -3) return;
+          options.onLoadFail?.(validatedURL, errorDescription);
+        },
+      );
+    }
+  }
+
+  installFullscreenForwarding(win);
+}
+
 export function createMainWindow(options: {
   preload: string;
   backgroundColor: string;
@@ -57,8 +93,9 @@ export function createMainWindow(options: {
   /** Full URL of the Dashboard document, including the theme query. */
   entryUrl: string;
   /** Origin that may navigate in-app. Anything else opens in the OS browser. */
-  appOrigin: string;
+  appOrigin: string | (() => string);
   onNavigate: (url: string) => void;
+  onLoadFail?: (url: string, errorDescription: string) => void;
 }): BrowserWindow {
   const win = new BrowserWindow({
     title: "Octop",
