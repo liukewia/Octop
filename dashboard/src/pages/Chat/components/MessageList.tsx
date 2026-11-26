@@ -291,7 +291,10 @@ export default function MessageList(props: MessageListProps) {
   } = props;
 
   const { t } = useTranslation();
-  const { agents, activeAgent } = useAgent();
+  const { agents, activeAgent } = useAgent((state) => ({
+    agents: state.agents,
+    activeAgent: state.activeAgent,
+  }));
   const virtuosoRef = useRef<VirtuosoHandle | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);

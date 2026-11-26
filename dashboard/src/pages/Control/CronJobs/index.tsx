@@ -94,7 +94,10 @@ function CronJobsPage() {
   const { isMobile, viewMode, setViewMode, showCardView } =
     useCardTableView("table");
   const navigate = useNavigate();
-  const { activeAgentId, activeAgent } = useAgent();
+  const { activeAgentId, activeAgent } = useAgent((state) => ({
+    activeAgentId: state.activeAgentId,
+    activeAgent: state.activeAgent,
+  }));
   const canManageJobs = activeAgent?.is_owner === true;
   const taskExamples = useTaskExamples(activeAgentId);
   const {

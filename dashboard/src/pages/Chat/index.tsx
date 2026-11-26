@@ -219,7 +219,13 @@ function ChatPageInner() {
     setActiveAgent,
     refresh: refreshAgents,
     loading: agentsLoading,
-  } = useAgent();
+  } = useAgent((state) => ({
+    activeAgentId: state.activeAgentId,
+    agents: state.agents,
+    setActiveAgent: state.setActiveAgent,
+    refresh: state.refresh,
+    loading: state.loading,
+  }));
   const resolvedAgentId = routeAgentId || activeAgentId;
   const hitlEnabled = useHitlEnabled(resolvedAgentId);
   const activeAgent = useMemo(

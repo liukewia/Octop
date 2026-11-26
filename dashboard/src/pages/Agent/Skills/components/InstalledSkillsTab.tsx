@@ -73,7 +73,7 @@ export default function InstalledSkillsTab({
   exportSkills,
 }: InstalledSkillsTabProps) {
   const { t } = useTranslation();
-  const { agents } = useAgent();
+  const { agents } = useAgent((state) => ({ agents: state.agents }));
   const workspaceReady = useMemo(
     () =>
       isAgentChatReady(

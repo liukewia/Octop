@@ -65,7 +65,11 @@ export default function PersonalizationPage() {
   const isMobile = useIsMobile();
   const navigate = useNavigate();
   const user = useCurrentUser();
-  const { activeAgentId, agents, loading } = useAgent();
+  const { activeAgentId, agents, loading } = useAgent((state) => ({
+    activeAgentId: state.activeAgentId,
+    agents: state.agents,
+    loading: state.loading,
+  }));
   // Personalization edits the selected expert, so it must be one the user
   // owns. The agent list puts other users' shared experts first, and the
   // agent bar only corrects the selection when the user owns an expert, so a

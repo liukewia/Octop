@@ -204,7 +204,7 @@ async function check503ForSetupRequired(
  * module scope so plain functions like ``request()`` can read it without
  * threading a context through every call site.
  *
- * The value is ALSO mirrored to ``localStorage["octop:active-agent"]`` by
+ * The value is ALSO mirrored to user-scoped localStorage by
  * the provider — but the source of truth at request time is this variable
  * so reactions stay synchronous.
  */

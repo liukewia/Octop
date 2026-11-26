@@ -14,7 +14,11 @@ import styles from "./index.module.less";
 
 function AgentConfigPage() {
   const { t } = useTranslation();
-  const { activeAgent, activeAgentId, refresh } = useAgent();
+  const { activeAgent, activeAgentId, refresh } = useAgent((state) => ({
+    activeAgent: state.activeAgent,
+    activeAgentId: state.activeAgentId,
+    refresh: state.refresh,
+  }));
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

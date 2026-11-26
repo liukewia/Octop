@@ -14,7 +14,10 @@ export default function PeerOnlyRemoteAlert({
   style,
 }: PeerOnlyRemoteAlertProps) {
   const { t } = useTranslation();
-  const { agents, activeAgentId } = useAgent();
+  const { agents, activeAgentId } = useAgent((state) => ({
+    agents: state.agents,
+    activeAgentId: state.activeAgentId,
+  }));
   const isPeer = agents.some(
     (agent) => agent.agent_id === activeAgentId && agent.bridge,
   );

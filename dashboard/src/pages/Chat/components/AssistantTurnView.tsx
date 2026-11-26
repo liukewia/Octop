@@ -161,7 +161,9 @@ export default function AssistantTurnView({
   readAloud = true,
 }: AssistantTurnViewProps) {
   const { t } = useTranslation();
-  const { activeAgentId } = useAgent();
+  const { activeAgentId } = useAgent((state) => ({
+    activeAgentId: state.activeAgentId,
+  }));
   const agentId = agentIdProp ?? activeAgentId;
   const speakerAgentId =
     messages.map((item) => messageSpeakerId(item)).find(Boolean) || agentId;

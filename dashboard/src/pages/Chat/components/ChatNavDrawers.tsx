@@ -29,7 +29,10 @@ function ChatNavDrawers({
   scope: ChatNavScope | null;
   onClose: () => void;
 }) {
-  const { agents, refresh } = useAgent();
+  const { agents, refresh } = useAgent((state) => ({
+    agents: state.agents,
+    refresh: state.refresh,
+  }));
   const members = useMemo(
     () =>
       agents.filter(

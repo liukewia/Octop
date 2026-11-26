@@ -264,7 +264,10 @@ function toOctopPatchBody(values: CronJobFormValues) {
 
 export function useCronJobs() {
   const { t } = useTranslation();
-  const { activeAgentId, activeAgent } = useAgent();
+  const { activeAgentId, activeAgent } = useAgent((state) => ({
+    activeAgentId: state.activeAgentId,
+    activeAgent: state.activeAgent,
+  }));
   const canManageJobs = activeAgent?.is_owner === true;
   const [jobs, setJobs] = useState<CronJob[]>([]);
   /** Which agent the currently painted `jobs` belong to (may lag activeAgent). */

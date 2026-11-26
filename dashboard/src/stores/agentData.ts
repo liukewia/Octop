@@ -1,0 +1,444 @@
+import { agentApi as legacyAgentApi } from "../api/modules/agent";
+import type { AgentRuntimeApiFields } from "../utils/agentRuntimeConfig";
+import { toBridgeShadowAgentId } from "../utils/remoteExpert";
+
+export interface OctopAgent extends AgentRuntimeApiFields {
+  /** Surrogate integer primary key from the database. */
+  id: number;
+  /** Public agent id used in API paths and ``X-Octop-Agent-Id``. */
+  agent_id: string;
+  /** Owning user id (present on list responses). */
+  user_id?: number | null;
+  /** Resolved username for admin list view. */
+  owner_username?: string | null;
+  /** Whether the owner has shared this expert with other users. */
+  is_shared?: boolean;
+  /** Who may use a shared expert: owner, all logged-in users, or user groups. */
+  visibility?: "owner" | "all" | "groups";
+  group_ids?: string[];
+  /** Whether the current user owns this expert. */
+  is_owner?: boolean;
+  name: string;
+  description: string | null;
+  persona_mbti: string | null;
+  default_model: string | null;
+  system_prompt: string | null;
+  template_name: string | null;
+  state: "running" | "stopped" | "failed" | "starting" | "stopping" | string;
+  last_error: string | null;
+  icon: string | null;
+  icon_name: string | null;
+  icon_url: string | null;
+  color: string | null;
+  compaction?: {
+    enabled?: boolean;
+    trigger_fraction?: number;
+    keep_fraction?: number;
+    trim_tokens?: number;
+  } | null;
+  config: Record<string, unknown>;
+  /** Knowledge bases opened by default in new chats with this expert. */
+  knowledge_base_ids?: string[];
+  /** Connectors opened by default in new chats with this expert. */
+  mcp_servers?: string[];
+  /** Aggregated unread count across all sessions for this agent (current user). */
+  unread_count?: number;
+  /**
+   * Unix seconds of this user's latest turn with the expert.
+   * ``null`` when they have never chatted with it.
+   */
+  last_active?: number | null;
+  /** True while BOOTSTRAP.md onboarding has not written ``.bootstrapped`` yet. */
+  bootstrap_pending?: boolean;
+  /** ``expert`` (default) or ``team`` host. */
+  kind?: "expert" | "team" | string;
+  /** Member agent ids when ``kind === "team"``. */
+  member_ids?: string[];
+  /** Roster display rows. Includes members the viewer cannot open alone. */
+  members?: Array<{
+    agent_id: string;
+    name: string;
+    color?: string | null;
+    icon_name?: string | null;
+    icon_url?: string | null;
+    kind?: string | null;
+    is_shared?: boolean;
+    user_id?: number | null;
+    managed_runner?: string | null;
+  }>;
+  welcome_message?: string | null;
+  /** True when this row is a remote shadow expert via cloud collab. */
+  bridge?: boolean;
+  bridge_connection_id?: string | null;
+  /** Display name of the cloud-collab link (chat group label). */
+  bridge_connection_name?: string | null;
+  /** Icon selected for the cloud-collab link (shown on remote expert badges). */
+  bridge_connection_icon?: string | null;
+  /** True while the cloud-collab link dropped but this shadow is still pinned. */
+  bridge_disconnected?: boolean;
+  /** True when this shadow arrived via a peer-initiated (inbound) link. */
+  bridge_inbound?: boolean;
+}
+
+export interface AgentState {
+  /** Latest agents fetched from ``GET /api/agents``. */
+  agents: OctopAgent[];
+  /** Active agent id, or ``null`` when no agent is selected. */
+  activeAgentId: string | null;
+  /** Convenience: the full record for ``activeAgentId``. */
+  activeAgent: OctopAgent | null;
+  /** True while the initial fetch is in flight. */
+  loading: boolean;
+  /** Last fetch error message, or ``null``. */
+  error: string | null;
+  /** Switch the active agent (updates store + localStorage + request.ts). */
+  setActiveAgent: (id: string | null) => void;
+  /** Force a re-fetch of ``/api/agents`` (e.g. after creating one). */
+  refresh: (options?: { silent?: boolean; force?: boolean }) => Promise<void>;
+}
+
+export interface EnabledExpertsOptions {
+  /**
+   * When ``true`` (opt-in; the default is ``false``), keep the
+   * ``resolvedAgentId`` expert in the returned list even if it does not
+   * match the predicate. Today every caller passes ``false`` so a disabled
+   * expert disappears from the sidebar / @-picker the moment the user stops
+   * it, including when it is the currently focused expert. The main panel
+   * still renders ``AgentNotReadyScreen`` on the same URL so users get a
+   * clear path to ``/experts`` to restart it.
+   */
+  pinActive?: boolean;
+}
+
+/**
+ * Pure helper: narrow ``agents`` down to those that are "enabled" for the
+ * chat surface (running experts). The same predicate is reused by:
+ *   • the chat page left sidebar (``Chat/index.tsx``)
+ *   • the minimal-layout records pane (``MinimalRecordsHost`` — non-/chat
+ *     routes like ``/experts`` show expert folders here)
+ *   • the chat composer's ``@``-mention picker + slash menu
+ *
+ * Keep this helper in sync with ``isAgentChatReady`` so disabled experts
+ * never leak into any chat-side surface.
+ */
+export function selectEnabledExperts(
+  agents: OctopAgent[],
+  resolvedAgentId: string | null | undefined,
+  options: EnabledExpertsOptions = {},
+): OctopAgent[] {
+  const { pinActive = false } = options;
+  const enabled = agents.filter(
+    (a) => a.state === "running" || Boolean(a.bridge_disconnected),
+  );
+  if (!pinActive || !resolvedAgentId) return enabled;
+  if (enabled.some((a) => a.agent_id === resolvedAgentId)) return enabled;
+  const pinnedActive = agents.find((a) => a.agent_id === resolvedAgentId);
+  if (!pinnedActive) return enabled;
+  return [pinnedActive, ...enabled];
+}
+
+function sameMemberIds(left?: string[], right?: string[]): boolean {
+  const a = left ?? [];
+  const b = right ?? [];
+  return a.length === b.length && a.every((id, index) => id === b[index]);
+}
+
+function sameTeamMembers(
+  left?: OctopAgent["members"],
+  right?: OctopAgent["members"],
+): boolean {
+  const a = left ?? [];
+  const b = right ?? [];
+  return (
+    a.length === b.length &&
+    a.every(
+      (item, index) =>
+        item.agent_id === b[index]?.agent_id && item.name === b[index]?.name,
+    )
+  );
+}
+
+/** True when a silent agent refresh would not change chat composer defaults. */
+export function agentsSnapshotEqual(
+  prev: OctopAgent[],
+  next: OctopAgent[],
+): boolean {
+  return (
+    prev.length === next.length &&
+    prev.every((a, i) => {
+      const b = next[i];
+      return (
+        a.agent_id === b.agent_id &&
+        a.state === b.state &&
+        a.unread_count === b.unread_count &&
+        a.last_active === b.last_active &&
+        a.bootstrap_pending === b.bootstrap_pending &&
+        a.name === b.name &&
+        a.icon === b.icon &&
+        a.icon_name === b.icon_name &&
+        a.icon_url === b.icon_url &&
+        a.color === b.color &&
+        a.kind === b.kind &&
+        a.bridge === b.bridge &&
+        a.is_owner === b.is_owner &&
+        a.is_shared === b.is_shared &&
+        a.visibility === b.visibility &&
+        a.bridge_connection_id === b.bridge_connection_id &&
+        a.bridge_connection_name === b.bridge_connection_name &&
+        a.bridge_disconnected === b.bridge_disconnected &&
+        a.bridge_inbound === b.bridge_inbound &&
+        a.default_model === b.default_model &&
+        sameMemberIds(a.member_ids, b.member_ids) &&
+        sameTeamMembers(a.members, b.members) &&
+        sameMemberIds(a.knowledge_base_ids, b.knowledge_base_ids) &&
+        sameMemberIds(a.mcp_servers, b.mcp_servers)
+      );
+    })
+  );
+}
+
+/**
+ * Shared projection used by the chat composer (`ChatInput` /
+ * ``composerLookups``). Keeps the lightweight ``ChatAgentOption`` shape
+ * consistent across surfaces — name/icon for the chip, shared badge for
+ * the picker, owner_username for the current-user indicator.
+ */
+export function projectChatAgentOption(agent: OctopAgent): {
+  agent_id: string;
+  name: string;
+  icon_name: string | null;
+  icon_url: string | null;
+  color: string | null;
+  is_shared: boolean;
+  is_owner: boolean;
+  owner_username: string | null;
+  bridge: boolean;
+  bridge_connection_id: string | null;
+  bridge_connection_name: string | null;
+  bridge_connection_icon: string | null;
+  bridge_disconnected: boolean;
+  bridge_inbound: boolean;
+  managed_runner: string | null;
+} {
+  return {
+    agent_id: agent.agent_id,
+    name: agent.name,
+    icon_name: agent.icon_name,
+    icon_url: agent.icon_url,
+    color: agent.color,
+    is_shared: Boolean(agent.is_shared),
+    is_owner: Boolean(agent.is_owner),
+    owner_username: agent.owner_username ?? null,
+    bridge: Boolean(agent.bridge),
+    bridge_connection_id: agent.bridge_connection_id ?? null,
+    bridge_connection_name: agent.bridge_connection_name ?? null,
+    bridge_connection_icon: agent.bridge_connection_icon ?? null,
+    bridge_disconnected: Boolean(agent.bridge_disconnected),
+    bridge_inbound: Boolean(agent.bridge_inbound),
+    managed_runner:
+      agent.kind === "managed" &&
+      typeof agent.config?.managed_runner === "string"
+        ? agent.config.managed_runner
+        : null,
+  };
+}
+
+interface ListAgentsResponse {
+  // Server returns OctopAgent[]; typed loosely so legacy agent.ts module
+  // (which has a different ``agentApi`` shape for finnie endpoints) stays
+  // untouched.
+  list: () => Promise<OctopAgent[]>;
+}
+
+export interface FetchAgentsResult {
+  agents: OctopAgent[];
+  liveConnectionIds: Set<string>;
+  /** Connections whose remote agent list returned successfully. */
+  resolvedConnectionIds: Set<string>;
+}
+
+/**
+ * Fetch ``/api/agents``. Tries the orca-flavored ``listAll`` method first,
+ * falls back to a direct request if the legacy module hasn't been
+ * regenerated yet.
+ */
+export async function fetchAgents(
+  includeBridge: boolean,
+): Promise<FetchAgentsResult> {
+  const candidate = legacyAgentApi as Partial<ListAgentsResponse> &
+    Record<string, unknown>;
+  let local: OctopAgent[] = [];
+  if (typeof candidate.list === "function") {
+    local = await candidate.list();
+  } else {
+    // Direct fallback so 14.3 doesn't depend on 14.6's API module rewrite.
+    const { request } = await import("../api/request");
+    local = await request<OctopAgent[]>("/agents");
+  }
+  const { remote, liveConnectionIds, resolvedConnectionIds } = includeBridge
+    ? await fetchBridgeShadowAgents()
+    : {
+        remote: [] as OctopAgent[],
+        liveConnectionIds: new Set<string>(),
+        resolvedConnectionIds: new Set<string>(),
+      };
+  const localIds = new Set(local.map((a) => a.agent_id));
+  return {
+    agents: [...local, ...remote.filter((a) => !localIds.has(a.agent_id))],
+    liveConnectionIds,
+    resolvedConnectionIds,
+  };
+}
+
+async function fetchBridgeShadowAgents(): Promise<{
+  remote: OctopAgent[];
+  liveConnectionIds: Set<string>;
+  resolvedConnectionIds: Set<string>;
+}> {
+  const empty = {
+    remote: [] as OctopAgent[],
+    liveConnectionIds: new Set<string>(),
+    resolvedConnectionIds: new Set<string>(),
+  };
+  try {
+    const { bridgeApi } = await import("../api/modules/bridge");
+    const connections = await bridgeApi.list();
+    const liveConnectionIds = new Set(
+      connections.map((c) => c.connection_id).filter(Boolean),
+    );
+    const connected = connections.filter((c) => c.status === "connected");
+    if (connected.length === 0) {
+      return { ...empty, liveConnectionIds };
+    }
+    const resolvedConnectionIds = new Set<string>();
+    const batches = await Promise.all(
+      connected.map(async (conn) => {
+        try {
+          const agents = await bridgeApi.listAgents(conn.connection_id);
+          resolvedConnectionIds.add(conn.connection_id);
+          return agents.map((agent) => mapBridgeAgent(agent, conn));
+        } catch {
+          return [] as OctopAgent[];
+        }
+      }),
+    );
+    return { remote: batches.flat(), liveConnectionIds, resolvedConnectionIds };
+  } catch {
+    // Bridge list failed (network or a stale permission). Keep local experts.
+    return empty;
+  }
+}
+
+function stringIdList(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const ids = value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return ids;
+}
+
+/**
+ * Peer public config the local UI reads. Composer mode and the storage
+ * backend stay; everything else remains on the peer.
+ */
+function bridgeShadowConfig(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const src = value as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  const mode = src.conversation_mode;
+  if (mode === "ask" || mode === "plan" || mode === "craft") {
+    out.conversation_mode = mode;
+  }
+  const backend = src.backend;
+  if (backend && typeof backend === "object" && !Array.isArray(backend)) {
+    out.backend = backend;
+  }
+  return out;
+}
+
+export function mapBridgeAgent(
+  agent: {
+    id?: string;
+    agent_id?: string;
+    name?: string;
+    description?: string | null;
+    icon_url?: string | null;
+    icon_name?: string | null;
+    color?: string | null;
+    kind?: string | null;
+    state?: string | null;
+    member_ids?: unknown;
+    is_owner?: boolean;
+    is_shared?: boolean;
+    default_model?: unknown;
+    knowledge_base_ids?: unknown;
+    mcp_servers?: unknown;
+    config?: unknown;
+  },
+  conn: {
+    connection_id: string;
+    display_name: string;
+    icon_name?: string | null;
+    inbound?: boolean;
+    has_password?: boolean;
+    /** False when this user only received the link. Missing means owned. */
+    is_owner?: boolean;
+    owner_username?: string | null;
+    owner_display_name?: string | null;
+  },
+): OctopAgent {
+  const agentId = String(agent.agent_id || agent.id || "");
+  const sharedLinkViewer = conn.is_owner === false;
+  const linkOwnedByViewer = !sharedLinkViewer;
+  const peerOwns = agent.is_owner !== false;
+  const memberIds = Array.isArray(agent.member_ids)
+    ? agent.member_ids
+        .map((id) =>
+          toBridgeShadowAgentId(conn.connection_id, String(id ?? "")),
+        )
+        .filter((id): id is string => Boolean(id))
+    : undefined;
+  const kind = agent.kind === "team" ? "team" : "expert";
+  const defaultModel =
+    typeof agent.default_model === "string" ? agent.default_model.trim() : "";
+  return {
+    id: 0,
+    agent_id: agentId,
+    name: String(agent.name || agentId),
+    description:
+      typeof agent.description === "string" ? agent.description : null,
+    persona_mbti: null,
+    default_model: defaultModel || null,
+    system_prompt: null,
+    template_name: null,
+    state: agent.state?.trim() || "stopped",
+    last_error: null,
+    icon: null,
+    icon_name: typeof agent.icon_name === "string" ? agent.icon_name : null,
+    icon_url: typeof agent.icon_url === "string" ? agent.icon_url : null,
+    color: typeof agent.color === "string" ? agent.color : null,
+    config: bridgeShadowConfig(agent.config),
+    knowledge_base_ids: stringIdList(agent.knowledge_base_ids),
+    // Team hosts do not attach connectors; match the local agents list.
+    mcp_servers: kind === "team" ? [] : stringIdList(agent.mcp_servers),
+    kind,
+    member_ids: memberIds,
+    bridge: true,
+    // A shared recipient can chat, but cannot edit / start / reload / delete.
+    // Peer ownership still applies when this user owns the link.
+    is_owner: linkOwnedByViewer && peerOwns,
+    is_shared: sharedLinkViewer || agent.is_shared === true,
+    owner_username: sharedLinkViewer
+      ? conn.owner_display_name || conn.owner_username || null
+      : null,
+    bridge_disconnected: false,
+    bridge_inbound: Boolean(conn.inbound) || conn.has_password === false,
+    bridge_connection_id: conn.connection_id,
+    bridge_connection_name: conn.display_name,
+    bridge_connection_icon:
+      typeof conn.icon_name === "string" && conn.icon_name.trim()
+        ? conn.icon_name.trim()
+        : null,
+  };
+}

@@ -274,7 +274,10 @@ export default function MBTISelector({
   const { t, i18n } = useTranslation();
   const lang = (i18n.language === "zh" ? "zh" : "en") as "zh" | "en";
   const navigate = useNavigate();
-  const { refresh: refreshAgents, activeAgentId } = useAgent();
+  const { refresh: refreshAgents, activeAgentId } = useAgent((state) => ({
+    refresh: state.refresh,
+    activeAgentId: state.activeAgentId,
+  }));
   const targetAgentId = agentId ?? activeAgentId ?? undefined;
 
   const [types, setTypes] = useState<MBTIType[]>([]);

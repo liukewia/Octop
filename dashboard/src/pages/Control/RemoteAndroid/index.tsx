@@ -147,7 +147,11 @@ export default function RemoteAndroidPage({
     storageKey: "octop:remote-phone:view-tab",
     defaultTab: "screen",
   });
-  const { activeAgent, activeAgentId, agents } = useAgent();
+  const { activeAgent, activeAgentId, agents } = useAgent((state) => ({
+    activeAgent: state.activeAgent,
+    activeAgentId: state.activeAgentId,
+    agents: state.agents,
+  }));
   const user = useCurrentUser();
   const canMobile = userCan(user, "mobile");
   const canvasRef = useRef<HTMLCanvasElement | null>(null);

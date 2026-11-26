@@ -17,7 +17,10 @@ export default function ChatEditExpertDrawer({
   agent: OctopAgent | null;
   onClose: () => void;
 }) {
-  const { agents, refresh } = useAgent();
+  const { agents, refresh } = useAgent((state) => ({
+    agents: state.agents,
+    refresh: state.refresh,
+  }));
   const team = agent && isTeamAgent(agent) ? agent : null;
   const expert = agent && !isTeamAgent(agent) ? agent : null;
   const memberExperts = useMemo(

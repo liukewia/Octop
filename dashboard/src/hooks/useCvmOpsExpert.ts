@@ -33,7 +33,10 @@ export function findCvmOpsAgent(rows: OctopAgent[]): OctopAgent | null {
 }
 
 export function useCvmOpsExpert(enabled: boolean) {
-  const { agents, refresh } = useAgent();
+  const { agents, refresh } = useAgent((state) => ({
+    agents: state.agents,
+    refresh: state.refresh,
+  }));
   const [agentId, setAgentId] = useState<string | null>(null);
   const [ensuring, setEnsuring] = useState(false);
   const [ensureError, setEnsureError] = useState<string | null>(null);

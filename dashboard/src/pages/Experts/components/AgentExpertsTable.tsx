@@ -97,7 +97,10 @@ export default function AgentExpertsTable({
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const user = useCurrentUser();
-  const { setActiveAgent, refresh: refreshAgents } = useAgent();
+  const { setActiveAgent, refresh: refreshAgents } = useAgent((state) => ({
+    setActiveAgent: state.setActiveAgent,
+    refresh: state.refresh,
+  }));
   const [localStates, setLocalStates] = useState<Record<string, string>>({});
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [workspaceAgentId, setWorkspaceAgentId] = useState<string | null>(null);

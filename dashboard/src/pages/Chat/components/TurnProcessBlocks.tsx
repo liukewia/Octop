@@ -51,7 +51,10 @@ export function TurnProcessBlocks({
   showAvatar = false,
 }: TurnProcessBlocksProps) {
   const { t } = useTranslation();
-  const { agents, activeAgent } = useAgent();
+  const { agents, activeAgent } = useAgent((state) => ({
+    agents: state.agents,
+    activeAgent: state.activeAgent,
+  }));
   const isTeamRoom = isTeamAgent(activeAgent);
   const speakerId =
     rewritePeerSpeakerId(activeAgent?.agent_id, agentId) || agentId;

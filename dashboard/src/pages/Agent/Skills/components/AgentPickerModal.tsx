@@ -17,7 +17,7 @@ export default function AgentPickerModal({
   onPick,
 }: AgentPickerModalProps) {
   const { t } = useTranslation();
-  const { agents } = useAgent();
+  const { agents } = useAgent((state) => ({ agents: state.agents }));
   const selectable = ownedSoloExperts(agents);
 
   return (

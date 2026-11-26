@@ -59,7 +59,7 @@ export default function SkillSourcePickerModal({
   onPickAgentSkill,
 }: SkillSourcePickerModalProps) {
   const { t } = useTranslation();
-  const { agents } = useAgent();
+  const { agents } = useAgent((state) => ({ agents: state.agents }));
   const [tab, setTab] = useState<PickerTab>("hub");
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [skills, setSkills] = useState<SkillSummary[]>([]);

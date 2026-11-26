@@ -150,7 +150,7 @@ export default function MemoryPanel({
   fill = true,
 }: MemoryPanelProps) {
   const { t } = useTranslation();
-  const { agents } = useAgent();
+  const { agents } = useAgent((state) => ({ agents: state.agents }));
   const agentKind = agents.find((agent) => agent.agent_id === agentId)?.kind;
   const tabs = useMemo(() => memoryTabsForKind(agentKind), [agentKind]);
   const conversationsOnly =

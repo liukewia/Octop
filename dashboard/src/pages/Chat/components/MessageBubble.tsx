@@ -619,7 +619,10 @@ function MessageBubble({
   const userAvatarIcon = isOwnMessage
     ? user?.avatar_icon
     : message.author?.avatarIcon;
-  const { agents, activeAgent } = useAgent();
+  const { agents, activeAgent } = useAgent((state) => ({
+    agents: state.agents,
+    activeAgent: state.activeAgent,
+  }));
   const isTeamRoom = isTeamAgent(activeAgent);
   const speakerId =
     rewritePeerSpeakerId(

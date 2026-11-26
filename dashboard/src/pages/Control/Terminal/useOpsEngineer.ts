@@ -52,7 +52,11 @@ function agentFromCreate(result: CreatedOpsEngineer): OctopAgent {
 }
 
 export function useOpsEngineer(enabled: boolean) {
-  const { agents, loading, refresh } = useAgent();
+  const { agents, loading, refresh } = useAgent((state) => ({
+    agents: state.agents,
+    loading: state.loading,
+    refresh: state.refresh,
+  }));
   const [agent, setAgent] = useState<OctopAgent | null>(null);
   const [ensuring, setEnsuring] = useState(false);
   const [ensureError, setEnsureError] = useState<string | null>(null);

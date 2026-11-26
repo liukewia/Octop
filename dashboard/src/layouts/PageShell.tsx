@@ -103,7 +103,9 @@ function PageShell({
   children,
 }: PageShellProps) {
   const isMobile = useIsMobile();
-  const { activeAgent } = useAgent();
+  const { activeAgent } = useAgent((state) => ({
+    activeAgent: state.activeAgent,
+  }));
   const outerPad = isMobile ? 12 : 32;
   const outerPadTop = isMobile ? 12 : 24;
   const contentPad = isMobile ? 12 : 24;

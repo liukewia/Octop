@@ -77,7 +77,10 @@ export function useChatComposerResources(
 ) {
   const user = useCurrentUser();
   const currentUserId = user?.id ?? null;
-  const { agents, loading: agentsLoading } = useAgent();
+  const { agents, loading: agentsLoading } = useAgent((state) => ({
+    agents: state.agents,
+    loading: state.loading,
+  }));
   const expert = agents.find((item) => item.agent_id === resolvedAgentId);
   const expertDefaultMode = parseConversationMode(
     expert?.config?.conversation_mode,

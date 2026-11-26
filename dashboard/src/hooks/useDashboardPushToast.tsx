@@ -96,7 +96,10 @@ export function useDashboardPushToast(): void {
   const { notification } = App.useApp();
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const { refresh, agents } = useAgent();
+  const { refresh, agents } = useAgent((state) => ({
+    refresh: state.refresh,
+    agents: state.agents,
+  }));
   const agentsRef = useRef(agents);
   agentsRef.current = agents;
   const notificationRef = useRef(notification);

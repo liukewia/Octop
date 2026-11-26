@@ -71,7 +71,7 @@ export default function SkillPackagesTab({
 }: SkillPackagesTabProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { agents } = useAgent();
+  const { agents } = useAgent((state) => ({ agents: state.agents }));
   const agent = useMemo(
     () => agents.find((row) => row.agent_id === agentId) ?? null,
     [agents, agentId],

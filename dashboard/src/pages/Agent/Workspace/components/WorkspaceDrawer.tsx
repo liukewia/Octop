@@ -295,7 +295,7 @@ export default function WorkspaceDrawer({
   const { modal, message } = App.useApp();
   const isMobile = useIsMobile();
   const timeZone = useServerTimezone();
-  const { agents } = useAgent();
+  const { agents } = useAgent((state) => ({ agents: state.agents }));
   const activeAgent = agents.find((a) => a.agent_id === agentId) ?? null;
   const workspaceReady = isAgentChatReady(activeAgent?.state);
 

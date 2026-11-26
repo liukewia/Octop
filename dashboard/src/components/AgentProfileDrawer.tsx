@@ -116,7 +116,7 @@ export default function AgentProfileDrawer({
   onClose,
 }: AgentProfileDrawerProps) {
   const { t } = useTranslation();
-  const { agents } = useAgent();
+  const { agents } = useAgent((state) => ({ agents: state.agents }));
   const viewerId = useCurrentUser()?.id;
   const skillDisplayName = useSkillDisplayName();
   const [loading, setLoading] = useState(false);

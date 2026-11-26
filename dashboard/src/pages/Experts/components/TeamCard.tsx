@@ -148,7 +148,10 @@ export const TeamCard = memo(function TeamCard({
   const { t } = useTranslation();
   const navigate = useNavigate();
   const user = useCurrentUser();
-  const { setActiveAgent, refresh: refreshAgents } = useAgent();
+  const { setActiveAgent, refresh: refreshAgents } = useAgent((state) => ({
+    setActiveAgent: state.setActiveAgent,
+    refresh: state.refresh,
+  }));
   const statusReadable = canReadAgentRuntimeStatus(agent, user);
 
   const [localState, setLocalState] = useState(agent.state);

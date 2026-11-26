@@ -861,7 +861,7 @@ function DimensionView({
 
 export default function TokenUsagePage() {
   const { t } = useTranslation();
-  const { agents } = useAgent();
+  const { agents } = useAgent((state) => ({ agents: state.agents }));
   const role = useUserRole();
   const isAdmin = role === "admin";
   const isMobile = useIsMobile();

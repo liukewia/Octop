@@ -1007,7 +1007,9 @@ export default function BridgeSettingsPanel({
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile();
-  const { refresh: refreshAgents } = useAgent();
+  const { refresh: refreshAgents } = useAgent((state) => ({
+    refresh: state.refresh,
+  }));
   const { viewMode, setViewMode, showCardView } = useCardTableView("card");
   const { toggleReveal, isRevealed } = useBridgePeerPrivacy();
   const privacy = useMemo<BridgePrivacy>(

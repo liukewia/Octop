@@ -30,7 +30,11 @@ export default function MinimalRecordsHost() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
-  const { agents, activeAgentId, setActiveAgent } = useAgent();
+  const { agents, activeAgentId, setActiveAgent } = useAgent((state) => ({
+    agents: state.agents,
+    activeAgentId: state.activeAgentId,
+    setActiveAgent: state.setActiveAgent,
+  }));
   const [shareTarget, setShareTarget] = useState<{
     agentId: string;
     threadId: string;

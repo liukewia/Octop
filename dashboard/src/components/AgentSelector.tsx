@@ -184,7 +184,14 @@ export default function AgentSelector({
   onChange,
 }: AgentSelectorProps) {
   const { t } = useTranslation();
-  const { agents, activeAgentId, setActiveAgent, loading } = useAgent();
+  const { agents, activeAgentId, setActiveAgent, loading } = useAgent(
+    (state) => ({
+      agents: state.agents,
+      activeAgentId: state.activeAgentId,
+      setActiveAgent: state.setActiveAgent,
+      loading: state.loading,
+    }),
+  );
   const controlled = onChange !== undefined;
   const chosenId = controlled ? value ?? null : activeAgentId;
   const commit = (id: string) => {

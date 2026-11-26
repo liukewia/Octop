@@ -367,7 +367,7 @@ export default function CloudAiPanel({
   /** 工作台切到其他页签时收起窗口，不卸载这段会话。 */
   hidden?: boolean;
 }) {
-  const { agents } = useAgent();
+  const { agents } = useAgent((state) => ({ agents: state.agents }));
   const [agentId, setAgentId] = useState<string | null>(
     () => preferredAgentId ?? findCvmOpsAgent(agents)?.agent_id ?? null,
   );

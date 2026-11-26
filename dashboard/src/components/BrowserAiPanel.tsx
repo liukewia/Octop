@@ -124,7 +124,10 @@ export default function BrowserAiPanel({
   // Saved skill names for keyword-trigger replay
   const [savedSkillNames, setSavedSkillNames] = useState<string[]>([]);
 
-  const { agents, activeAgentId } = useAgent();
+  const { agents, activeAgentId } = useAgent((state) => ({
+    agents: state.agents,
+    activeAgentId: state.activeAgentId,
+  }));
   const [agentId, setAgentId] = useState<string | null>(readBrowserAgentId);
   const activeAgent =
     agents.find((agent) => agent.agent_id === agentId) ?? null;

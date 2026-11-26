@@ -125,7 +125,10 @@ export default function ExpertsPage() {
   const navigate = useNavigate();
   const lang: "zh" | "en" = i18n.language?.startsWith("zh") ? "zh" : "en";
   const isMobile = useIsMobile();
-  const { agents, refresh: refreshAgents } = useAgent();
+  const { agents, refresh: refreshAgents } = useAgent((state) => ({
+    agents: state.agents,
+    refresh: state.refresh,
+  }));
   const currentUser = useCurrentUser();
   const canAddCloudExpert = navAllowed(currentUser, "bridge");
   const openCloudCollab = useCallback(() => {

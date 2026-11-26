@@ -263,7 +263,7 @@ function EditAgentDrawerBody({
   const [runtimeOpen, setRuntimeOpen] = useState(false);
   const { t, i18n } = useTranslation();
   const { modal, message } = App.useApp();
-  const { refresh } = useAgent();
+  const { refresh } = useAgent((state) => ({ refresh: state.refresh }));
   const skillDisplayName = useSkillDisplayName();
   const [workspaceSettingsOpen, setWorkspaceSettingsOpen] = useState(false);
   const [workspaceDrawerOpen, setWorkspaceDrawerOpen] = useState(false);

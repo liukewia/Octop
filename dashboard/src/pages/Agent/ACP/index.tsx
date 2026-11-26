@@ -57,7 +57,10 @@ interface ACPPanelProps {
 export function ACPPanel({ agentId: agentIdProp }: ACPPanelProps = {}) {
   const { t } = useTranslation();
   const { modal, message } = App.useApp();
-  const { activeAgentId: contextAgentId, agents } = useAgent();
+  const { activeAgentId: contextAgentId, agents } = useAgent((state) => ({
+    activeAgentId: state.activeAgentId,
+    agents: state.agents,
+  }));
   const activeAgentId =
     agentIdProp !== undefined ? agentIdProp : contextAgentId;
   /** Only the Experts tools drawer should tunnel account-global ACP runners. */
