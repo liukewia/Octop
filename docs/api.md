@@ -646,6 +646,10 @@ Example client configuration:
 The exact transport key differs by MCP client. Some clients use `http`
 instead of `streamable_http`.
 
+For Andon Q integration boundaries, caller isolation, and credential-lifecycle
+checks, see [the integration readiness guide](andon-q-integration.md). This
+endpoint currently uses normal access JWTs, not MCP-scoped service credentials.
+
 ## Observability & security
 
 | Method | Path | Auth | Notes |
