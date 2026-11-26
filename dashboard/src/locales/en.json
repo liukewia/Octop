@@ -4117,6 +4117,7 @@
     "codexOAuthHint": "Use ChatGPT subscription OAuth instead of an API key. An openai-codex provider is created automatically after login.",
     "codexOAuthSuccess": "ChatGPT login succeeded; the model provider is configured.",
     "codexOAuthFailed": "ChatGPT login failed: {{error}}",
+    "codexOAuthModelsFailed": "ChatGPT is connected, but model discovery failed: {{error}}. Retry fetching models in provider settings.",
     "codexOAuthStartFailed": "Could not start ChatGPT OAuth",
     "codexOAuthDisclaimer": "This uses the ChatGPT Codex internal API, not the official api.openai.com API key flow. Review OpenAI terms and stability risks before use.",
     "codexOAuthDeviceHint": "The verification page opened in a new tab. If it didn't, click the button below, then enter the code shown here to finish signing in — this page updates automatically.",

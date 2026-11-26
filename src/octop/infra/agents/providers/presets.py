@@ -306,16 +306,7 @@ def load_provider_presets() -> list[dict[str, Any]]:
                 "protocol": "openai",
                 "api_key_prefix": "",
                 "auth_method": "codex_oauth",
-                "models": [
-                    {"id": "gpt-5.4", "name": "GPT-5.4", "enabled": True, "input": ["text"]},
-                    {
-                        "id": "gpt-5.4-mini",
-                        "name": "GPT-5.4 mini",
-                        "enabled": True,
-                        "input": ["text"],
-                    },
-                    {"id": "gpt-5.5", "name": "GPT-5.5", "enabled": True, "input": ["text"]},
-                ],
+                "models": [],  # account-specific; discovered after OAuth
                 "logo_id": "openai",
             },
         )
@@ -360,4 +351,9 @@ def load_provider_presets() -> list[dict[str, Any]]:
             if profile is not None:
                 model["reasoning"] = True
                 model["reasoning_config"] = profile
+    # Bundled harness templates may also carry a static Codex catalog. The host
+    # owns OAuth binding; templates cannot claim models available to an account.
+    for preset in out:
+        if preset.get("id") == "openai-codex":
+            preset["models"] = []
     return out

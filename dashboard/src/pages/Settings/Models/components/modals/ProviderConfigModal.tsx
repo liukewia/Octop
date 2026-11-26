@@ -1069,6 +1069,8 @@ export function ProviderConfigModal({
       }
 
       const added: ProviderModel[] = missing.map((m) => ({
+        api_mode: m.api_mode,
+        api_fallback: m.api_fallback,
         id: m.id,
         name: m.name || m.id,
         enabled: false,

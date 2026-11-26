@@ -152,6 +152,8 @@ export function CustomProviderModal({
       const remote: ProviderModel[] = (result.models ?? [])
         .filter((m) => !embeddingLane || isEmbeddingModel(m))
         .map((m) => ({
+          api_mode: m.api_mode,
+          api_fallback: m.api_fallback,
           id: m.id,
           name: m.name || m.id,
           enabled: false,

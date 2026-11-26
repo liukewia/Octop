@@ -13,7 +13,11 @@ import httpx
 
 from octop.infra.agents.providers import KIND_TO_PROTOCOL
 from octop.infra.agents.providers.headers import assemble_provider_headers
-from octop.infra.agents.providers.magpie import is_magpie_provider, magpie_catalog_model
+from octop.infra.agents.providers.model_discovery import (
+    ModelDiscoveryContext,
+    ModelDiscoveryError,
+    discover_provider_models,
+)
 from octop.infra.agents.providers.presets import load_provider_presets
 
 logger = logging.getLogger(__name__)
@@ -302,11 +306,6 @@ async def probe_provider_row(
     }
 
 
-def _models_list_url(base_url: str | None) -> str:
-    root = (base_url or "").strip().rstrip("/") or _DEFAULT_OPENAI_BASE_URL
-    return f"{root}/models"
-
-
 async def fetch_openai_compatible_models(
     *,
     base_url: str | None,
@@ -316,93 +315,18 @@ async def fetch_openai_compatible_models(
     provider_name: str | None = None,
     extra: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Use Tencent plan catalogs; otherwise list models via ``GET {base}/models``."""
-    url = _models_list_url(base_url)
-    # Token Plan and HY Token Plan share a URL, so also match the selected preset.
-    for preset in load_provider_presets():
-        if (
-            preset["id"]
-            in {
-                "tencent-coding-plan",
-                "tencent-token-plan",
-                "tencent-token-plan-enterprise-cn",
-                "tencent-hy-token-plan",
-            }
-            and provider_name in {preset["id"], preset["name"]}
-            and url == _models_list_url(preset.get("base_url"))
-        ):
-            return {"ok": True, "models": preset["models"]}
-    headers: dict[str, str] = {"Authorization": f"Bearer {api_key}"}
-    # Model listing is not a chat turn. OpenCode still needs a throwaway
-    # session; Magpie listing must not invent one.
-    magpie = is_magpie_provider(provider_name=provider_name, base_url=base_url, extra=extra)
-    merged_headers = assemble_provider_headers(
-        provider_name,
-        extra_headers,
-        base_url=base_url,
-        extra=extra,
-        probe=not magpie,
-    )
-    if merged_headers:
-        headers.update(merged_headers)
+    """Compatibility entry point; protocol selection belongs to discovery adapters."""
     try:
-        async with httpx.AsyncClient(timeout=_FETCH_MODELS_TIMEOUT_S) as client:
-            response = await client.get(url, headers=headers)
-    except Exception as exc:
-        logger.info(
-            "provider fetch-models failed for %s: %r (%s)",
-            url,
-            exc,
-            type(exc).__name__,
+        models = await discover_provider_models(
+            ModelDiscoveryContext(
+                base_url=base_url,
+                api_key=api_key,
+                provider_name=provider_name,
+                extra=extra or {},
+                extra_headers=extra_headers or {},
+                presets=load_provider_presets(),
+            )
         )
-        return {"ok": False, "error": _friendly_probe_error(exc, locale=locale)}
-
-    if response.status_code >= 400:
-        detail = response.text.strip()
-        if len(detail) > 300:
-            detail = detail[:300] + "…"
-        error = f"HTTP {response.status_code}"
-        if detail:
-            error = f"{error}: {detail}"
-        return {"ok": False, "error": _friendly_probe_error(error, locale=locale)}
-
-    try:
-        payload = response.json()
-    except Exception:
-        return {
-            "ok": False,
-            "error": "response is not valid JSON (expected OpenAI-compatible /models)",
-        }
-
-    data = payload.get("data") if isinstance(payload, dict) else None
-    if not isinstance(data, list):
-        return {
-            "ok": False,
-            "error": "response is not OpenAI-compatible (expected {data: [{id, …}]})",
-        }
-
-    models: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    for item in data:
-        if not isinstance(item, dict):
-            continue
-        if magpie:
-            mapped = magpie_catalog_model(item)
-            if mapped is None:
-                continue
-            mid = str(mapped["id"])
-            if mid in seen:
-                continue
-            seen.add(mid)
-            models.append(mapped)
-            continue
-        raw_id = item.get("id")
-        if not isinstance(raw_id, str) or not raw_id.strip():
-            continue
-        mid = raw_id.strip()
-        if mid in seen:
-            continue
-        seen.add(mid)
-        models.append({"id": mid, "name": mid})
-    models.sort(key=lambda m: str(m["id"]))
+    except ModelDiscoveryError as exc:
+        return {"ok": False, "error": _friendly_probe_error(str(exc), locale=locale)}
     return {"ok": True, "models": models}

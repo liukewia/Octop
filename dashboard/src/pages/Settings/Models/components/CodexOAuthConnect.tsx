@@ -50,6 +50,13 @@ export function CodexOAuthConnect({ onSuccess }: CodexOAuthConnectProps) {
             setDevice(null);
             setLoading(false);
             message.success(t("models.codexOAuthSuccess"));
+            if (pending.model_discovery_error) {
+              message.warning(
+                t("models.codexOAuthModelsFailed", {
+                  error: pending.model_discovery_error,
+                }),
+              );
+            }
             await onSuccess();
           } else if (pending.status === "error") {
             stopPolling();

@@ -54,6 +54,8 @@ export interface FetchProviderModelsParams {
 }
 
 export interface FetchedProviderModel {
+  api_mode?: ProviderModel["api_mode"];
+  api_fallback?: ProviderModel["api_fallback"];
   id: string;
   name: string;
   input?: string[];
@@ -99,5 +101,6 @@ export async function pollCodexOAuth(stateId: string) {
     error?: string;
     provider_id?: number;
     provider_name?: string;
+    model_discovery_error?: string | null;
   }>(`/admin/providers/codex-oauth/pending/${encodeURIComponent(stateId)}`);
 }

@@ -191,6 +191,8 @@ export function PresetProviderModal({
         .map((m) => {
           if (isMagpie) return magpieModelFromCatalog(m);
           return {
+            api_mode: m.api_mode,
+            api_fallback: m.api_fallback,
             id: m.id,
             name: m.name || m.id,
             enabled: false,

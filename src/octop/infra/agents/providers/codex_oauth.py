@@ -160,10 +160,8 @@ def refresh_codex_token(paths: PathLayout, cred: CodexOAuthCredentials) -> Codex
         with urllib.request.urlopen(req, timeout=TOKEN_REQUEST_TIMEOUT_S) as resp:
             data = json.loads(resp.read())
     except urllib.error.HTTPError as exc:
-        body_text = exc.read().decode(errors="replace")
-        raise CodexOAuthRefreshError(
-            f"Codex token refresh failed (HTTP {exc.code}): {body_text}"
-        ) from exc
+        # OAuth error bodies can contain secrets and are later logged by callers.
+        raise CodexOAuthRefreshError(f"Codex token refresh failed (HTTP {exc.code})") from None
     new_access = data["access_token"]
     new_cred = CodexOAuthCredentials(
         access=new_access,

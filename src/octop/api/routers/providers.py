@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from octop.api.deps import current_user, get_server, require_permission
 from octop.infra.agents.providers.codex_apply import (
     CODEX_PROVIDER_NAME,
-    apply_codex_credentials,
+    complete_codex_login,
     sync_refreshed_codex_api_key,
 )
 from octop.infra.agents.providers.codex_oauth import (
@@ -26,6 +26,7 @@ from octop.infra.agents.providers.codex_oauth import (
     request_device_code,
 )
 from octop.infra.agents.providers.magpie import MAGPIE_DEFAULT_BASE_URL, discover_local_magpie
+from octop.infra.agents.providers.model_discovery import is_codex_endpoint
 from octop.infra.agents.providers.model_flags import is_local_runtime_provider
 from octop.infra.agents.providers.presets import load_provider_presets
 from octop.infra.agents.providers.probe import (
@@ -254,21 +255,20 @@ class ProviderFetchModelsBody(BaseModel):
 
 
 def _is_codex_base_url(base_url: str | None) -> bool:
-    return bool(base_url and "chatgpt.com/backend-api/codex" in base_url)
+    return is_codex_endpoint(base_url)
 
 
 async def _maybe_refresh_codex_row(server: Any, row: Any) -> Any:
-    if row.name != CODEX_PROVIDER_NAME and not _is_codex_base_url(row.base_url):
+    # The global OAuth file belongs only to this managed binding, not custom rows.
+    if row.name != CODEX_PROVIDER_NAME or not _is_codex_base_url(row.base_url):
         return row
     paths = server.services.paths
     token = await asyncio.to_thread(get_valid_access_token, paths)
     if not token:
         return row
-    if row.api_key != token:
-        sync_refreshed_codex_api_key(server.services, paths, token)
-        refreshed = server.services.provider_repo.get(row.id)
-        return refreshed if refreshed is not None else row
-    return row
+    sync_refreshed_codex_api_key(server.services, paths, token)
+    refreshed = server.services.provider_repo.get(row.id)
+    return refreshed if refreshed is not None else row
 
 
 def _saved_default_model(extra: dict[str, Any]) -> str | None:
@@ -602,14 +602,14 @@ async def admin_test_provider_draft(
     )
 
 
-@admin_router.post("/fetch-models", summary="List models from an OpenAI-compatible draft")
+@admin_router.post("/fetch-models", summary="List models using the provider discovery adapter")
 async def admin_fetch_provider_models(
     body: ProviderFetchModelsBody,
     request: Request,
     _: Any = Depends(require_permission("providers")),
     server: Any = Depends(get_server),
 ) -> dict[str, Any]:
-    """Fetch remote model ids via OpenAI-compatible ``GET /models`` (openai kind only).
+    """Discover models via the provider adapter (openai transport kind).
 
     A blank ``api_key`` reuses the key stored for ``provider_id``. The stored
     key is not included in the response.
@@ -619,17 +619,41 @@ async def admin_fetch_provider_models(
             "ok": False,
             "error": "fetch models is only supported for openai-compatible providers",
         }
+    saved = server.services.provider_repo.get(body.provider_id) if body.provider_id else None
+    stored_codex = bool(
+        saved is not None
+        and saved.name == CODEX_PROVIDER_NAME
+        and is_codex_endpoint(saved.base_url)
+        and not (body.api_key or "").strip()
+    )
+    if stored_codex:
+        if body.base_url and not is_codex_endpoint(body.base_url):
+            return {"ok": False, "error": "ChatGPT OAuth credentials require the Codex endpoint"}
+        saved = await _maybe_refresh_codex_row(server, saved)
     api_key = _resolve_provider_secret(server, typed=body.api_key, provider_id=body.provider_id)
     if not api_key:
         return {"ok": False, "error": "api_key is required"}
-    draft = SimpleNamespace(extra_json=body.extra_json)
+    # A stored binding needs its account header and adapter identity even when the
+    # caller sends only provider_id. Explicit draft metadata still takes priority.
+    draft = SimpleNamespace(
+        extra_json=body.extra_json
+        if body.extra_json is not None
+        else getattr(saved, "extra_json", None)
+    )
+    headers = provider_headers(draft)
+    if stored_codex:
+        # The editor may still have the previous account id after token rotation.
+        headers = {k: v for k, v in headers.items() if k.lower() != "chatgpt-account-id"}
+        headers.update(
+            {k: v for k, v in provider_headers(saved).items() if k.lower() == "chatgpt-account-id"}
+        )
     return await fetch_openai_compatible_models(
-        base_url=(body.base_url or "").strip() or None,
+        base_url=(body.base_url or getattr(saved, "base_url", None) or "").strip() or None,
         api_key=api_key,
-        extra_headers=provider_headers(draft) or None,
+        extra_headers=headers or None,
         locale=resolve_request_locale(request),
-        provider_name=(body.name or "").strip() or None,
-        extra=_extra_dict(body.extra_json),
+        provider_name=(body.name or getattr(saved, "name", None) or "").strip() or None,
+        extra=_extra_dict(draft.extra_json),
     )
 
 
@@ -653,7 +677,9 @@ async def _run_codex_device_poll(
                 continue
             code, verifier = result
             cred = await asyncio.to_thread(exchange_device_code, code, verifier)
-            pid = apply_codex_credentials(server.services, server.services.paths, cred)
+            pid, discovery = await complete_codex_login(
+                server.services, server.services.paths, cred
+            )
             if server.app_runtime is not None:
                 await server.app_runtime.agent_registry.on_provider_changed(
                     provider_name=CODEX_PROVIDER_NAME,
@@ -665,6 +691,7 @@ async def _run_codex_device_poll(
                         "status": "ok",
                         "provider_id": pid,
                         "provider_name": CODEX_PROVIDER_NAME,
+                        "model_discovery_error": discovery.get("error"),
                         "user_id": user_id,
                     }
                 ),
