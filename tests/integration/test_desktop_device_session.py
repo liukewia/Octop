@@ -81,7 +81,7 @@ async def test_device_token_round_trip(env: Any, monkeypatch: pytest.MonkeyPatch
     assert r.status_code == 200
     body = r.json()
     assert body["token_type"] == "Bearer"
-    assert body["expires_in"] == srv.services.config.access_token_ttl_seconds
+    assert 0 < body["expires_in"] <= srv.services.config.access_token_ttl_seconds
 
     me = await c.get("/api/auth/me", headers=bearer(body["access_token"]))
     assert me.status_code == 200
@@ -206,3 +206,55 @@ async def test_device_token_is_jwt_exempt_but_register_is_not(
         # Setup is still incomplete here: lockdown answers before auth does.
         r = await c.post("/api/auth/device/register", json={"device_token": DEVICE_TOKEN})
         assert r.status_code in {401, 503}
+
+
+async def test_device_background_renewal_cannot_reset_72h(env, monkeypatch):
+    import json
+    import time
+    from dataclasses import replace
+
+    from octop.infra.auth.tokens import MAX_SESSION_SECONDS, decode_token
+
+    c, srv, token = env
+    monkeypatch.setenv("OCTOP_DESKTOP_SHELL", "1")
+    r = await c.post(
+        "/api/auth/device/register", json={"device_token": DEVICE_TOKEN}, headers=bearer(token)
+    )
+    assert r.status_code == 200
+    stored = json.loads(srv.services.secret_repo.get("desktop_device"))
+    stored["session_started_at"] = int(time.time()) - MAX_SESSION_SECONDS
+    srv.services.secret_repo.rotate("desktop_device", json.dumps(stored).encode())
+    r = await c.post("/api/auth/device/token", json={"device_token": DEVICE_TOKEN})
+    assert r.status_code == 401
+    object.__setattr__(
+        srv.services,
+        "config",
+        replace(
+            srv.services.config,
+            login_consent_enabled=True,
+            user_agreement_url="https://portal.example/terms",
+            privacy_policy_url="",
+        ),
+    )
+    r = await c.post(
+        "/api/auth/device/token", json={"device_token": DEVICE_TOKEN, "consent_accepted": True}
+    )
+    assert r.status_code == 503
+    object.__setattr__(
+        srv.services,
+        "config",
+        replace(srv.services.config, privacy_policy_url="https://portal.example/privacy"),
+    )
+    r = await c.post(
+        "/api/auth/device/token", json={"device_token": DEVICE_TOKEN, "consent_accepted": True}
+    )
+    assert r.status_code == 200
+    payload = decode_token(srv.services.secret_repo.get("jwt"), r.json()["access_token"])
+    r = await c.post("/api/auth/device/token", json={"device_token": DEVICE_TOKEN})
+    assert r.status_code == 200
+    assert (
+        decode_token(srv.services.secret_repo.get("jwt"), r.json()["access_token"])[
+            "session_started_at"
+        ]
+        == payload["session_started_at"]
+    )

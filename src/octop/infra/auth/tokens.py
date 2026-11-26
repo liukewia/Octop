@@ -16,6 +16,8 @@ PURPOSE_REAUTH: TokenPurpose = "reauth"
 
 _VALID_PURPOSES = frozenset({"access", "mfa", "reauth"})
 
+MAX_SESSION_SECONDS = 72 * 60 * 60
+
 # Short-lived challenge tokens (MFA verify / reauth grant).
 MFA_TOKEN_TTL_SECONDS = 300
 REAUTH_TOKEN_TTL_SECONDS = 300
@@ -34,11 +36,12 @@ def sign_token(
     uname: str,
     role: str,
     purpose: TokenPurpose,
-    ttl_seconds: int = 86400,
+    ttl_seconds: int = MAX_SESSION_SECONDS,
     mfa_version: int = 0,
     password_version: int = 0,
     amr: str | None = None,
     jti: str | None = None,
+    session_started_at: int | None = None,
 ) -> str:
     """Mint a JWT. ``purpose`` is required; missing purpose must fail closed."""
     if purpose not in _VALID_PURPOSES:
@@ -53,6 +56,9 @@ def sign_token(
         "exp": now + ttl_seconds,
     }
     if purpose == PURPOSE_ACCESS:
+        started = now if session_started_at is None else session_started_at
+        payload["session_started_at"] = started
+        payload["exp"] = min(payload["exp"], started + MAX_SESSION_SECONDS)
         payload["mfa_version"] = int(mfa_version)
         payload["password_version"] = int(password_version)
     elif purpose == PURPOSE_MFA:
@@ -71,6 +77,10 @@ def decode_token(secret: bytes, token: str) -> dict[str, Any]:
         payload = jwt.decode(token, secret, algorithms=["HS256"])
         if "sub" in payload:
             payload["sub"] = int(payload["sub"])
+        if payload.get("purpose") in (None, PURPOSE_ACCESS):
+            started = access_session_started_at(payload)
+            if time.time() >= started + MAX_SESSION_SECONDS:
+                raise TokenExpired()
         return payload
     except jwt.ExpiredSignatureError as exc:
         raise TokenExpired() from exc
@@ -106,3 +116,11 @@ def _optional_int_claim(payload: dict[str, Any], key: str) -> int:
         return int(raw)
     except (TypeError, ValueError) as exc:
         raise InvalidToken(f"invalid {key}") from exc
+
+
+def access_session_started_at(payload: dict[str, Any]) -> int:
+    """Legacy access tokens start at iat; rotation must never move this origin."""
+    raw = payload.get("session_started_at", payload.get("iat"))
+    if isinstance(raw, bool) or not isinstance(raw, int) or raw > time.time():
+        raise InvalidToken("invalid session start")
+    return raw

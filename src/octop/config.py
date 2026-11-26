@@ -130,7 +130,10 @@ class OctopConfig:
     bind_host: str = "127.0.0.1"
     port: int = 8088
     log_level: str = "info"
-    access_token_ttl_seconds: int = 86400
+    access_token_ttl_seconds: int = 259200
+    login_consent_enabled: bool = False
+    user_agreement_url: str = ""
+    privacy_policy_url: str = ""
     login_max_attempts: int = 5
     login_lockout_seconds: int = 900
     cors_origins: list[str] = field(default_factory=list)
@@ -511,6 +514,19 @@ def normalize_public_base_url(raw: object) -> str:
     return f"{parts.scheme}://{parts.netloc}"
 
 
+def normalize_policy_url(raw: Any, key: str) -> str:
+    """Policy links are operator-provided HTTPS URLs, never executable schemes."""
+    if not isinstance(raw, str):
+        raise ValueError(f"{key} must be a string")
+    text = raw.strip()
+    if not text:
+        return ""
+    parts = urlparse(text)
+    if parts.scheme != "https" or not parts.hostname or parts.username or parts.password:
+        raise ValueError(f"{key} must be an absolute HTTPS URL without credentials")
+    return text
+
+
 def validate_persisted_config(raw: dict[str, Any]) -> None:
     """Raise ``ValueError`` when ``raw`` cannot be stored as ``config.json``.
 
@@ -552,7 +568,12 @@ def validate_persisted_config(raw: dict[str, Any]) -> None:
         except ZoneInfoNotFoundError:
             raise ValueError("default_timezone must be an IANA timezone name") from None
     _optional_str(raw, "git_binary")
-    for key in ("enable_dashboard", "enable_api_docs", "require_setup_password"):
+    for key in (
+        "enable_dashboard",
+        "enable_api_docs",
+        "require_setup_password",
+        "login_consent_enabled",
+    ):
         _optional_bool(raw, key)
     upload = _optional_int(raw, "max_upload_mb")
     if upload is not None and not MIN_MAX_UPLOAD_MB <= upload <= MAX_MAX_UPLOAD_MB:
@@ -562,6 +583,10 @@ def validate_persisted_config(raw: dict[str, Any]) -> None:
         raise ValueError("browser_idle_timeout_minutes must be >= 0")
     if "public_base_url" in raw:
         normalize_public_base_url(raw.get("public_base_url"))
+
+    for key in ("user_agreement_url", "privacy_policy_url"):
+        if key in raw:
+            normalize_policy_url(raw[key], key)
 
     if "database" in raw:
         section = _parse_database_section(raw.get("database"))
@@ -805,6 +830,9 @@ def load_config(path: Path) -> OctopConfig:
         port=int(merged["port"]),
         log_level=merged["log_level"],
         access_token_ttl_seconds=int(merged["access_token_ttl_seconds"]),
+        login_consent_enabled=bool(merged["login_consent_enabled"]),
+        user_agreement_url=normalize_policy_url(merged["user_agreement_url"], "user_agreement_url"),
+        privacy_policy_url=normalize_policy_url(merged["privacy_policy_url"], "privacy_policy_url"),
         login_max_attempts=int(merged.get("login_max_attempts", 5)),
         login_lockout_seconds=int(merged.get("login_lockout_seconds", 900)),
         cors_origins=list(merged.get("cors_origins") or []),

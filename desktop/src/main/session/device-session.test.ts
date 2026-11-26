@@ -134,7 +134,9 @@ test("renew exchanges the credential for a JWT", async () => {
   const call = callAt(fx.calls, 0);
   assert.equal(call.url, "http://127.0.0.1:51234/api/auth/device/token");
   assert.equal(call.authorization, undefined, "the token endpoint is unauthenticated");
-  assert.deepEqual(call.body, { device_token: "stored-secret" });
+  assert.deepEqual(call.body, { device_token: "stored-secret", consent_accepted: false });
+  await fx.client.renew(true);
+  assert.deepEqual(callAt(fx.calls, 1).body, { device_token: "stored-secret", consent_accepted: true });
 
   await fx.cleanup();
 });

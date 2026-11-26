@@ -570,7 +570,9 @@
     "WEBAUTHN_LOGIN_DISABLED": "登录页的通行密钥登录已关闭。管理员可在「应用设置 → 通行密钥」中开启。",
     "GIT_NO_CHANGES": "没有可提交的更改。",
     "GIT_COMMIT_MESSAGE_INVALID": "模型没有返回可用的提交信息，请手动填写。",
-    "GIT_PUSH_DETACHED": "当前处于 detached HEAD，无法推送。"
+    "GIT_PUSH_DETACHED": "当前处于 detached HEAD，无法推送。",
+    "LOGIN_CONSENT_REQUIRED": "请先同意用户协议和隐私政策。",
+    "LOGIN_POLICY_UNAVAILABLE": "登录协议链接尚未配置，请联系管理员。"
   },
   "desktop": {
     "install_log_deps": "正在安装 Python 依赖…",

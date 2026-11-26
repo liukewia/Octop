@@ -123,8 +123,8 @@ const bridge = {
     register(accessToken: string): Promise<boolean> {
       return ipcRenderer.invoke(IPC_CHANNELS.sessionRegister, accessToken);
     },
-    renew(): Promise<IssuedSession | null> {
-      return ipcRenderer.invoke(IPC_CHANNELS.sessionRenew);
+    renew(consentAccepted = false): Promise<IssuedSession | null> {
+      return ipcRenderer.invoke(IPC_CHANNELS.sessionRenew, consentAccepted);
     },
     revoke(accessToken: string): Promise<boolean> {
       return ipcRenderer.invoke(IPC_CHANNELS.sessionRevoke, accessToken);

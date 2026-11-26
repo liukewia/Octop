@@ -103,11 +103,13 @@ export async function registerDeviceSession(
 }
 
 /** Ask the shell for a new JWT; null when the credential is gone or refused. */
-export async function renewDesktopSession(): Promise<IssuedSession | null> {
+export async function renewDesktopSession(
+  consentAccepted = false,
+): Promise<IssuedSession | null> {
   const session = bridge();
   if (!session) return null;
   try {
-    return await session.renew();
+    return await session.renew(consentAccepted);
   } catch {
     return null;
   }

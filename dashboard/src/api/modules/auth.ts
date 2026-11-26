@@ -87,6 +87,13 @@ export interface OctopUser {
   default_backend_type?: string | null;
 }
 
+export interface LoginPolicy {
+  enabled: boolean;
+  ready: boolean;
+  user_agreement_url: string;
+  privacy_policy_url: string;
+}
+
 export interface LoginResponse {
   access_token: string;
   token_type: string;
@@ -385,6 +392,8 @@ export const authApi = {
     return result;
   },
 
+  getLoginPolicy: () => request<LoginPolicy>("/auth/login-policy"),
+
   /** Public captcha widget config for the login form. */
   getCaptcha: () => request<PublicCaptcha>("/auth/captcha"),
 
@@ -393,14 +402,16 @@ export const authApi = {
     username: string,
     password: string,
     captchaToken?: string,
+    consentAccepted = false,
   ): Promise<LoginResult> => {
     const raw = await request<RawLoginResponse>("/auth/login", {
       method: "POST",
-      body: JSON.stringify(
-        captchaToken
-          ? { username, password, captcha_token: captchaToken }
-          : { username, password },
-      ),
+      body: JSON.stringify({
+        username,
+        password,
+        captcha_token: captchaToken,
+        consent_accepted: consentAccepted,
+      }),
     });
     return toLoginResult(raw);
   },
@@ -415,17 +426,28 @@ export const authApi = {
   getLdapStatus: () => request<LdapStatus>("/auth/ldap/status"),
 
   /** Start an OIDC authorization-code login flow. */
-  startOidc: (redirect_after?: string) =>
+  startOidc: (redirect_after?: string, consentAccepted = false) =>
     request<{ authorization_url: string }>("/auth/oidc/start", {
       method: "POST",
-      body: JSON.stringify({ redirect_after }),
+      body: JSON.stringify({
+        redirect_after,
+        consent_accepted: consentAccepted,
+      }),
     }),
 
   /** Start an OAuth/OIDC authorization-code login flow by provider kind. */
-  startOauth: (kind: string, redirect_after?: string) =>
+  startOauth: (
+    kind: string,
+    redirect_after?: string,
+    consentAccepted = false,
+  ) =>
     request<{ authorization_url: string }>("/auth/oauth/start", {
       method: "POST",
-      body: JSON.stringify({ kind, redirect_after }),
+      body: JSON.stringify({
+        kind,
+        redirect_after,
+        consent_accepted: consentAccepted,
+      }),
     }),
 
   /** Start an OAuth flow that binds the identity to the current user. */
@@ -504,10 +526,11 @@ export const authApi = {
   /** Passwordless passkey — finish; issues access token (satisfies MFA). */
   passkeyLoginVerify: async (
     credential: AuthenticationCredentialJSON,
+    consentAccepted = false,
   ): Promise<LoginResponse> => {
     const raw = await request<RawLoginResponse>("/auth/passkey/login/verify", {
       method: "POST",
-      body: JSON.stringify({ credential }),
+      body: JSON.stringify({ credential, consent_accepted: consentAccepted }),
     });
     const result = toLoginResult(raw);
     if (isMfaChallenge(result)) {

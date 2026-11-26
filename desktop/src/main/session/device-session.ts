@@ -61,10 +61,10 @@ export class DeviceSessionClient {
   }
 
   /** Mint a fresh JWT, or null when there is no usable credential. */
-  async renew(): Promise<IssuedSession | null> {
+  async renew(consentAccepted = false): Promise<IssuedSession | null> {
     const secret = await this.options.store.read();
     if (!secret) return null;
-    const res = await this.post("/api/auth/device/token", { device_token: secret });
+    const res = await this.post("/api/auth/device/token", { device_token: secret, consent_accepted: consentAccepted });
     if (res.status !== 200) {
       desktopLog().warn(`[desktop] device session renewal returned ${res.status}`);
       return null;

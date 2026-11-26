@@ -509,8 +509,8 @@ function registerIpcHandlers(): void {
     return deviceSession?.register(accessToken) ?? Promise.resolve(false);
   });
 
-  ipcMain.handle(IPC_CHANNELS.sessionRenew, (): Promise<IssuedSession | null> => {
-    return deviceSession?.renew() ?? Promise.resolve(null);
+  ipcMain.handle(IPC_CHANNELS.sessionRenew, (_event, consentAccepted: unknown): Promise<IssuedSession | null> => {
+    return deviceSession?.renew(consentAccepted === true) ?? Promise.resolve(null);
   });
 
   ipcMain.handle(IPC_CHANNELS.sessionRevoke, (_event, accessToken: unknown): Promise<boolean> => {

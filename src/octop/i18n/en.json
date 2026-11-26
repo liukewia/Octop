@@ -570,7 +570,9 @@
     "WEBAUTHN_LOGIN_DISABLED": "Passkey sign-in on the login page is turned off. An administrator can enable it under App settings → Passkeys.",
     "GIT_NO_CHANGES": "There are no changes to commit.",
     "GIT_COMMIT_MESSAGE_INVALID": "The model did not return a usable commit message; please write one.",
-    "GIT_PUSH_DETACHED": "Cannot push while HEAD is detached."
+    "GIT_PUSH_DETACHED": "Cannot push while HEAD is detached.",
+    "LOGIN_CONSENT_REQUIRED": "Please agree to the User Agreement and Privacy Policy before signing in.",
+    "LOGIN_POLICY_UNAVAILABLE": "Login policies are not configured. Contact the administrator."
   },
   "desktop": {
     "install_log_deps": "Installing Python dependencies…",

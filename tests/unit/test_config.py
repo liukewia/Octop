@@ -16,7 +16,9 @@ def test_defaults_when_missing(tmp_path: Path):
     cfg = load_config(cfg_path)
     assert cfg.bind_host == "127.0.0.1"
     assert cfg.port == 8088
-    assert cfg.access_token_ttl_seconds == 86400
+    assert cfg.access_token_ttl_seconds == 259200
+    assert cfg.login_consent_enabled is False
+    assert cfg.user_agreement_url == cfg.privacy_policy_url == ""
     assert cfg.enable_dashboard is True
     assert cfg.enable_api_docs is False
     assert cfg.require_setup_password is True
@@ -516,3 +518,40 @@ def test_non_object_config_raises(tmp_path: Path):
     with pytest.raises(ValueError, match="JSON object"):
         load_config(cfg_path)
     assert cfg_path.read_text(encoding="utf-8") == "[1, 2]"
+
+
+def test_login_policy_config(tmp_path):
+    import json
+
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "login_consent_enabled": True,
+                "user_agreement_url": "https://portal.example/terms",
+                "privacy_policy_url": "https://portal.example/privacy",
+            }
+        )
+    )
+    cfg = load_config(path)
+    assert cfg.login_consent_enabled is True
+    assert cfg.user_agreement_url == "https://portal.example/terms"
+    assert cfg.privacy_policy_url == "https://portal.example/privacy"
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "javascript:alert(1)",
+        "http://portal.example/terms",
+        "/terms",
+        "https://user:pass@portal.example/terms",
+    ],
+)
+def test_login_policy_rejects_unsafe_links(tmp_path, url):
+    import json
+
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps({"user_agreement_url": url}))
+    with pytest.raises(ValueError):
+        load_config(path)

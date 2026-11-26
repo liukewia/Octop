@@ -9,7 +9,9 @@ from typing import TYPE_CHECKING, Any, cast
 from fastapi import Depends, Header, Query, Request
 
 from octop.infra.auth.tokens import (
+    MAX_SESSION_SECONDS,
     PURPOSE_ACCESS,
+    access_session_started_at,
     token_mfa_version,
     token_password_version,
     token_purpose,
@@ -56,6 +58,7 @@ _JWT_EXEMPT_EXACT = (
     # credential and the router enforces shell-flag + loopback + digest match.
     "/api/auth/device/token",
     "/api/auth/captcha",
+    "/api/auth/login-policy",
     "/api/auth/mfa/verify",
     "/api/auth/mfa/passkey/options",
     "/api/auth/passkey/status",
@@ -167,7 +170,8 @@ def maybe_sliding_renew_token(server: OctopServer, token: str, user: User) -> st
     """Return a fresh access token when ``token`` is past the sliding renew threshold.
 
     Threshold is two-thirds of ``access_token_ttl_seconds`` remaining. Active clients
-    that pick up ``ACCESS_TOKEN_RESPONSE_HEADER`` stay signed in without re-login.
+    that pick up ``ACCESS_TOKEN_RESPONSE_HEADER`` stay signed in only until the
+    original session reaches its fixed 72-hour deadline.
     """
     assert server.services is not None
     payload = _decode(server, token)
@@ -182,9 +186,15 @@ def maybe_sliding_renew_token(server: OctopServer, token: str, user: User) -> st
         if row is not None and int(row.mfa_version) != 0:
             return None
     ttl = int(server.services.config.access_token_ttl_seconds)
-    remaining = int(payload["exp"]) - int(time.time())
+    now = int(time.time())
+    started = access_session_started_at(payload)
+    remaining = int(payload["exp"]) - now
     threshold = max(1, int(ttl * _SLIDING_RENEW_REMAINING_FRACTION))
     if remaining >= threshold:
+        return None
+    # A default 72h token already reaches the absolute deadline. Do not
+    # pointlessly re-sign it on every request after the refresh threshold.
+    if min(now + ttl, started + MAX_SESSION_SECONDS) <= int(payload["exp"]):
         return None
     secret = server.services.secret_repo.get("jwt")
     if secret is None:
@@ -199,9 +209,21 @@ def maybe_sliding_renew_token(server: OctopServer, token: str, user: User) -> st
         role=user.role,
         purpose=PURPOSE_ACCESS,
         ttl_seconds=ttl,
+        session_started_at=started,
         mfa_version=mfa_version,
         password_version=password_version,
     )
+
+
+def request_session_started_at(request: Request, server: OctopServer) -> int:
+    """Preserve the authenticated session across password/MFA token rotation."""
+    raw = extract_raw_token(
+        authorization=request.headers.get("authorization"),
+        access_token=request.query_params.get("access_token"),
+    )
+    if not raw:
+        raise OctopError(ErrorCode.MISSING_CREDENTIALS, "missing credentials")
+    return access_session_started_at(_decode(server, raw))
 
 
 def authenticate_request(request: Request, server: OctopServer) -> User:

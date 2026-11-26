@@ -65,7 +65,7 @@ export interface DesktopSessionBridge {
   /** Bind the credential to the signed-in user; false when the shell refused. */
   register(accessToken: string): Promise<boolean>;
   /** Mint a fresh JWT, or null when this install has no usable credential. */
-  renew(): Promise<DesktopIssuedSession | null>;
+  renew(consentAccepted?: boolean): Promise<DesktopIssuedSession | null>;
   /** Forget this install's credential. */
   revoke(accessToken: string): Promise<boolean>;
 }

@@ -17,7 +17,7 @@ from octop.api.deps import (
     maybe_sliding_renew_token,
     sign_token,
 )
-from octop.infra.auth.tokens import PURPOSE_ACCESS
+from octop.infra.auth.tokens import MAX_SESSION_SECONDS, PURPOSE_ACCESS
 from octop.infra.server import OctopServer
 
 
@@ -138,7 +138,12 @@ async def test_near_expiry_token_gets_sliding_renew(client) -> None:
     assert renewed
     assert renewed != short
     payload = decode_token(secret, renewed)
-    assert int(payload["exp"]) - int(payload["iat"]) == srv.services.config.access_token_ttl_seconds
+    started = decode_token(secret, short)["session_started_at"]
+    assert payload["session_started_at"] == started
+    assert payload["exp"] == min(
+        payload["iat"] + srv.services.config.access_token_ttl_seconds,
+        started + MAX_SESSION_SECONDS,
+    )
 
 
 async def test_maybe_sliding_renew_helper_threshold(client) -> None:

@@ -282,7 +282,9 @@
     "WEBAUTHN_LOGIN_DISABLED": "登录页的通行密钥登录已关闭。管理员可在「应用设置 → 通行密钥」中开启。",
     "GIT_NO_CHANGES": "没有可提交的更改。",
     "GIT_COMMIT_MESSAGE_INVALID": "模型没有返回可用的提交信息，请手动填写。",
-    "GIT_PUSH_DETACHED": "当前处于 detached HEAD，无法推送。"
+    "GIT_PUSH_DETACHED": "当前处于 detached HEAD，无法推送。",
+    "LOGIN_CONSENT_REQUIRED": "我已阅读并同意《用户协议》和《隐私政策》",
+    "LOGIN_POLICY_UNAVAILABLE": "协议链接尚未配置，请联系管理员后再登录。"
   },
   "nav": {
     "chat": "对话",
@@ -6532,7 +6534,6 @@
     "subtitle": "懂你、帮你、陪你成长的智能伙伴",
     "username": "用户名或邮箱",
     "password": "密码",
-    "remember": "记住登录状态",
     "submit": "登录",
     "createLocalAccount": "新建本机账户",
     "signInLocalAccount": "登录本地账户",
@@ -6604,7 +6605,13 @@
     "mfaFailed": "两步验证失败。",
     "mfaHintTotp": "请输入身份验证器中的 6 位验证码。",
     "mfaHintPasskey": "使用通行密钥完成登录。",
-    "mfaHintRecovery": "请输入一份恢复码。"
+    "mfaHintRecovery": "请输入一份恢复码。",
+    "agreePrefix": "我已阅读并同意",
+    "userAgreement": "《用户协议》",
+    "agreeAnd": "和",
+    "privacyPolicy": "《隐私政策》",
+    "policyUnavailable": "协议链接尚未配置，请联系管理员后再登录。",
+    "policyLoadFailed": "无法加载登录协议配置，请刷新重试。"
   },
   "invite": {
     "title": "邀请注册",

@@ -30,8 +30,10 @@ from typing import Any
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 
-from octop.api.deps import current_user, get_server, sign_token
-from octop.infra.auth.tokens import PURPOSE_ACCESS
+from octop.api.common.login_policy import LoginConsentBody
+from octop.api.deps import current_user, get_server, request_session_started_at, sign_token
+from octop.infra.auth.login_policy import ensure_login_consent
+from octop.infra.auth.tokens import MAX_SESSION_SECONDS, PURPOSE_ACCESS
 from octop.infra.desktop import desktop_shell_enabled
 from octop.infra.errors import ErrorCode, OctopError
 
@@ -57,7 +59,7 @@ class RegisterBody(BaseModel):
     )
 
 
-class DeviceTokenBody(BaseModel):
+class DeviceTokenBody(LoginConsentBody):
     device_token: str = Field(min_length=32, max_length=200)
 
 
@@ -153,6 +155,7 @@ async def register_device(
         "hash": _digest(body.device_token),
         "label": body.label or "",
         "created_at": int(time.time()),
+        "session_started_at": request_session_started_at(request, server),
     }
     _write_secret(server, payload)
     server.services.audit_repo.write(
@@ -190,8 +193,22 @@ async def device_token(
         _record_failure(host)
         raise OctopError(ErrorCode.USER_DISABLED, "user not active")
 
+    now = int(time.time())
+    started = int(stored.get("session_started_at", stored.get("created_at", 0)))
+    if body.consent_accepted:
+        # Only the explicit sign-in button sends acceptance; background renewal
+        # cannot reset the session, even on installs with the policy hidden.
+        ensure_login_consent(server.services.config, body.consent_accepted)
+        started = now
+        stored["session_started_at"] = started
+        _write_secret(server, stored)
+    elif now >= started + MAX_SESSION_SECONDS:
+        raise OctopError(ErrorCode.TOKEN_EXPIRED, "device session expired")
+
     secret = server.services.secret_repo.get("jwt")
-    ttl = int(server.services.config.access_token_ttl_seconds)
+    ttl = min(
+        int(server.services.config.access_token_ttl_seconds), started + MAX_SESSION_SECONDS - now
+    )
     row = server.services.user_repo.get(user.id)
     mfa_version = int(row.mfa_version) if row is not None else 0
     password_version = int(row.password_version) if row is not None else 0
@@ -202,6 +219,7 @@ async def device_token(
         role=user.role,
         purpose=PURPOSE_ACCESS,
         ttl_seconds=ttl,
+        session_started_at=started,
         mfa_version=mfa_version,
         password_version=password_version,
     )

@@ -20,6 +20,7 @@ import {
   authApi,
   isMfaChallenge,
   type LdapStatus,
+  type LoginPolicy,
   type MfaChallengeResponse,
   type MfaMethod,
   type OauthProviderStatus,
@@ -128,7 +129,12 @@ export default function LoginPage() {
   const [searchParams] = useSearchParams();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [remember, setRemember] = useState(true);
+  const [consentAccepted, setConsentAccepted] = useState(false);
+  const [loginPolicy, setLoginPolicy] = useState<LoginPolicy | null>(null);
+  const [policyFailed, setPolicyFailed] = useState(false);
+  const canSignIn =
+    loginPolicy !== null &&
+    (!loginPolicy.enabled || (loginPolicy.ready && consentAccepted));
   const [loading, setLoading] = useState(false);
   const [providers, setProviders] = useState<OauthProviderStatus[]>([]);
   const [ldap, setLdap] = useState<LdapStatus | null>(null);
@@ -160,12 +166,27 @@ export default function LoginPage() {
     void applyGuestLocale();
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    authApi
+      .getLoginPolicy()
+      .then((policy) => {
+        if (!cancelled) setLoginPolicy(policy);
+      })
+      .catch(() => {
+        if (!cancelled) setPolicyFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Desktop: landing here does not mean a signed-out user. The shell holds a
   // device credential and the wizard minted a password no human ever types, so
   // try a refresh before showing a form nobody can fill in. Runs once per page
   // load, so a server that keeps refusing cannot bounce us in a loop.
   useEffect(() => {
-    if (desktopAutoLoginTried) return;
+    if (!loginPolicy || desktopAutoLoginTried) return;
     desktopAutoLoginTried = true;
     // Logout of the local account sets this so the form stays up for other
     // accounts. The flag dies with the window; the next launch can enter again.
@@ -185,7 +206,7 @@ export default function LoginPage() {
     return () => {
       cancelled = true;
     };
-  }, [navigate]);
+  }, [navigate, loginPolicy]);
 
   useEffect(() => {
     let cancelled = false;
@@ -300,14 +321,14 @@ export default function LoginPage() {
   const finishLogin = useCallback(
     async (accessToken: string, locale: string | null | undefined) => {
       conditionalAbortRef.current?.abort();
-      setAuthToken(accessToken, remember);
+      setAuthToken(accessToken, true);
       setMfaChallenge(null);
       setMfaCode("");
       const applied = await applyUserLocale(locale);
       void refreshServerLabels(applied);
       navigate("/chat", { replace: true });
     },
-    [navigate, remember],
+    [navigate],
   );
 
   // Conditional UI: passkeys appear in the username autofill when available.
@@ -317,7 +338,8 @@ export default function LoginPage() {
       !passwordlessLogin ||
       !passkeyAvailable ||
       passkeyIpHost ||
-      !conditionalOk
+      !conditionalOk ||
+      !canSignIn
     ) {
       return;
     }
@@ -331,7 +353,10 @@ export default function LoginPage() {
         const credential = await webauthnGetConditional(options, ac.signal);
         if (cancelled || ac.signal.aborted) return;
         setLoading(true);
-        const res = await authApi.passkeyLoginVerify(credential);
+        const res = await authApi.passkeyLoginVerify(
+          credential,
+          consentAccepted,
+        );
         await finishLogin(res.access_token, res.user.locale);
       } catch (err) {
         if (cancelled || ac.signal.aborted || isWebAuthnAbortError(err)) {
@@ -359,6 +384,8 @@ export default function LoginPage() {
       }
     };
   }, [
+    canSignIn,
+    consentAccepted,
     conditionalOk,
     finishLogin,
     mfaChallenge,
@@ -376,14 +403,19 @@ export default function LoginPage() {
   };
 
   const onSso = async (kind: string) => {
+    if (!canSignIn) return;
     setSsoLoadingKind(kind);
-    setRememberLoginPreference(remember);
+    setRememberLoginPreference(true);
     let popup: Window | null = null;
     if (kind !== "oidc") {
       popup = openSsoPopup();
     }
     try {
-      const { authorization_url } = await authApi.startOauth(kind, "/chat");
+      const { authorization_url } = await authApi.startOauth(
+        kind,
+        "/chat",
+        consentAccepted,
+      );
       if (kind === "oidc") {
         window.location.href = authorization_url;
         return;
@@ -409,6 +441,7 @@ export default function LoginPage() {
   };
 
   const handleLocalAccount = async () => {
+    if (!canSignIn) return;
     if (!localAccountExists) {
       navigate("/setup?localAccount=1");
       return;
@@ -416,7 +449,7 @@ export default function LoginPage() {
     setLocalLoading(true);
     try {
       releaseDesktopLocalAutoLogin();
-      const issued = await renewDesktopSession();
+      const issued = await renewDesktopSession(true);
       if (!issued?.access_token || !isLocalDesktopUser(issued.access_token)) {
         message.error(t("login.localSignInFailed"));
         return;
@@ -429,11 +462,16 @@ export default function LoginPage() {
   };
 
   const handleLogin = async () => {
-    if (!username || !password || !captchaReady) return;
+    if (!canSignIn || !username || !password || !captchaReady) return;
     setLoading(true);
     try {
       const token = await captchaRef.current?.getToken();
-      const res = await authApi.login(username, password, token);
+      const res = await authApi.login(
+        username,
+        password,
+        token,
+        consentAccepted,
+      );
       if (isMfaChallenge(res)) {
         setMfaChallenge(res);
         setMfaMode(defaultMfaMode(res.methods));
@@ -499,6 +537,7 @@ export default function LoginPage() {
   };
 
   const handlePasskeyLogin = async () => {
+    if (!canSignIn) return;
     if (!passkeyAvailable) {
       message.warning(t("login.passkeyHttpsRequired"));
       return;
@@ -513,7 +552,7 @@ export default function LoginPage() {
     try {
       const options = await authApi.passkeyLoginOptions();
       const credential = await webauthnGet(options);
-      const res = await authApi.passkeyLoginVerify(credential);
+      const res = await authApi.passkeyLoginVerify(credential, consentAccepted);
       await finishLogin(res.access_token, res.user.locale);
     } catch (err) {
       if (isWebAuthnAbortError(err)) return;
@@ -817,19 +856,48 @@ export default function LoginPage() {
             alignItems: "center",
             justifyContent: "space-between",
             gap: 12,
+            flexWrap: "wrap",
           }}
         >
-          <Checkbox
-            checked={remember}
-            onChange={(e) => setRemember(e.target.checked)}
-            style={{
-              margin: 0,
-              fontSize: 13,
-              color: "var(--fn-text-tertiary)",
-            }}
-          >
-            {t("login.remember")}
-          </Checkbox>
+          {loginPolicy?.enabled && (
+            <Checkbox
+              checked={consentAccepted}
+              disabled={!loginPolicy.ready}
+              onChange={(e) => setConsentAccepted(e.target.checked)}
+              style={{
+                margin: 0,
+                fontSize: 13,
+                color: "var(--fn-text-tertiary)",
+              }}
+            >
+              {t("login.agreePrefix")}
+              {loginPolicy.user_agreement_url ? (
+                <a
+                  href={loginPolicy.user_agreement_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {t("login.userAgreement")}
+                </a>
+              ) : (
+                t("login.userAgreement")
+              )}
+              {t("login.agreeAnd")}
+              {loginPolicy.privacy_policy_url ? (
+                <a
+                  href={loginPolicy.privacy_policy_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {t("login.privacyPolicy")}
+                </a>
+              ) : (
+                t("login.privacyPolicy")
+              )}
+            </Checkbox>
+          )}
           <button
             type="button"
             data-testid="login-forgot-password-toggle"
@@ -849,6 +917,18 @@ export default function LoginPage() {
             {t("login.forgotPassword", "Forgot password?")}
           </button>
         </div>
+        {(policyFailed || (loginPolicy?.enabled && !loginPolicy.ready)) && (
+          <p
+            role="alert"
+            style={{ color: "var(--fn-text-tertiary)", fontSize: 13 }}
+          >
+            {t(
+              policyFailed
+                ? "login.policyLoadFailed"
+                : "login.policyUnavailable",
+            )}
+          </p>
+        )}
         <ForgotPasswordModal
           open={showForgotHelp}
           onClose={() => setShowForgotHelp(false)}
@@ -860,7 +940,7 @@ export default function LoginPage() {
           block
           loading={loading}
           onClick={handleLogin}
-          disabled={!username || !password || !captchaReady}
+          disabled={!canSignIn || !username || !password || !captchaReady}
           style={{ borderRadius: 10, height: 44, fontWeight: 500 }}
         >
           {t("login.submit")}
@@ -874,6 +954,7 @@ export default function LoginPage() {
                 block
                 icon={<Fingerprint size={16} />}
                 loading={loading}
+                disabled={!canSignIn}
                 onClick={() => void handlePasskeyLogin()}
                 style={{ height: 36, fontWeight: 500 }}
               >
@@ -885,6 +966,7 @@ export default function LoginPage() {
                 block
                 icon={<Fingerprint size={18} />}
                 loading={loading}
+                disabled={!canSignIn}
                 onClick={() => void handlePasskeyLogin()}
                 style={{ borderRadius: 10, height: 44, fontWeight: 500 }}
               >
@@ -945,6 +1027,7 @@ export default function LoginPage() {
             block
             data-testid="login-create-local"
             loading={localLoading}
+            disabled={!canSignIn}
             onClick={() => void handleLocalAccount()}
             style={{ borderRadius: 10, height: 44, fontWeight: 500 }}
           >
@@ -965,6 +1048,7 @@ export default function LoginPage() {
                 block
                 icon={providerIcon(provider)}
                 loading={ssoLoadingKind === provider.kind}
+                disabled={!canSignIn}
                 onClick={() => void onSso(provider.kind)}
                 style={{ borderRadius: 10, height: 44, fontWeight: 500 }}
               >

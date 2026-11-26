@@ -282,7 +282,9 @@
     "WEBAUTHN_LOGIN_DISABLED": "Passkey sign-in on the login page is turned off. An administrator can enable it under App settings → Passkeys.",
     "GIT_NO_CHANGES": "There are no changes to commit.",
     "GIT_COMMIT_MESSAGE_INVALID": "The model did not return a usable commit message; please write one.",
-    "GIT_PUSH_DETACHED": "Cannot push while HEAD is detached."
+    "GIT_PUSH_DETACHED": "Cannot push while HEAD is detached.",
+    "LOGIN_CONSENT_REQUIRED": "I agree to the User Agreement and Privacy Policy",
+    "LOGIN_POLICY_UNAVAILABLE": "Policy links are not configured. Contact the administrator before signing in."
   },
   "nav": {
     "chat": "Conversation",
@@ -6532,7 +6534,6 @@
     "subtitle": "An intelligent partner that understands you, helps you, and grows with you",
     "username": "Username or email",
     "password": "Password",
-    "remember": "Remember me",
     "submit": "Sign in",
     "createLocalAccount": "Create a local account",
     "signInLocalAccount": "Sign in to local account",
@@ -6604,7 +6605,13 @@
     "mfaFailed": "Two-factor verification failed.",
     "mfaHintTotp": "Enter the 6-digit code from your authenticator app.",
     "mfaHintPasskey": "Confirm with your passkey to finish signing in.",
-    "mfaHintRecovery": "Enter one of your recovery codes."
+    "mfaHintRecovery": "Enter one of your recovery codes.",
+    "agreePrefix": "I agree to the ",
+    "userAgreement": "User Agreement",
+    "agreeAnd": " and ",
+    "privacyPolicy": "Privacy Policy",
+    "policyUnavailable": "Policy links are not configured. Contact the administrator before signing in.",
+    "policyLoadFailed": "Unable to load login policies. Reload the page to retry."
   },
   "invite": {
     "title": "Join with invite",

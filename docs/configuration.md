@@ -98,7 +98,10 @@ on each start. Schema (`OctopConfig` in `octop/config.py`):
   "bind_host": "127.0.0.1",
   "port": 8088,
   "log_level": "info",
-  "access_token_ttl_seconds": 86400,
+  "access_token_ttl_seconds": 259200,
+  "login_consent_enabled": false,
+  "user_agreement_url": "",
+  "privacy_policy_url": "",
   "login_max_attempts": 5,
   "login_lockout_seconds": 900,
   "cors_origins": [],
@@ -159,6 +162,45 @@ Notes:
   Plugins). Bundled plugins are copied into `~/.octop/plugins/` on init and
   server start with `enabled: false`. `bundled_plugins_seeded` lists ids
   already offered so uninstall does not come back on the next start.
+
+## Login consent and three-day sessions
+
+- `login_consent_enabled` defaults to `false` for existing self-hosted installs.
+  Enabling it replaces “Remember me” with an **unchecked** agreement checkbox.
+  Password/LDAP, passkey and OAuth/OIDC login entry points enforce explicit
+  `consent_accepted: true` server-side; strings/numbers are not accepted.
+- Set `user_agreement_url` and `privacy_policy_url` to the actual published Octop
+  Portal **HTTPS** pages before enabling it. Defaults are empty: no URLs or legal
+  terms are invented. When enabled without both links, the page explains the
+  missing configuration and new interactive logins fail with
+  `LOGIN_POLICY_UNAVAILABLE` (503), even if acceptance is submitted directly.
+  Disabled means the policy is not enforced, **not** that deployment is compliant.
+  Restart after changing `config.json`. These three keys have no environment aliases.
+- `GET /api/auth/login-policy` exposes only these public links and the
+  `enabled`/`ready` flags. Failure to load it blocks the form rather than silently
+  skipping consent. Consent stays in component memory, never local/session storage.
+  OAuth consent is checked before issuing the one-time SSO state; callbacks and
+  MFA continuation use their existing short-lived state/challenge protections.
+- New logins use persistent browser storage (no remember-me choice) and default
+  to 259200 seconds. The absolute maximum is **72 hours from the original login**,
+  not calendar days or a sliding window. JWT refresh, password changes and MFA
+  management token replacements preserve `session_started_at` and cannot extend
+  the deadline. Shorter explicit `access_token_ttl_seconds` / `OCTOP_ACCESS_TOKEN_TTL`
+  values remain supported; set old installs' 86400 value to 259200 for three days
+  of idle persistence. Longer configured TTLs are capped at 72 hours.
+- Existing JWTs use their signed `iat` as the original session start. They remain
+  usable until the earlier of their `exp` and `iat + 72h`; legacy tokens lacking
+  a valid origin fail closed. Enabling the checkbox does not retroactively revoke
+  active sessions. Existing session-only browser tokens remain supported until
+  the next login; new logins always persist. MFA challenge and reauth TTLs stay 5 min.
+- Desktop background device renewal preserves the same origin stored with the
+  device registration and stops at 72 hours. Only explicit local-account sign-in
+  (and consent when enabled) starts a new session; it cannot auto-reenter forever.
+  The updated desktop IPC bridge is required for this manual acceptance path.
+- This controls **login**, not first-run setup or invite registration flows.
+  It does not provide policy versioning, a durable legal-consent audit ledger,
+  legal text, or cross-tab logout/revocation. Publish/review the actual policies
+  and assess those deployment requirements before claiming compliance.
 
 ## Environment overrides
 

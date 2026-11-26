@@ -11,6 +11,7 @@ from octop.infra.auth.mfa import totp as totp_mod
 from octop.infra.auth.mfa import webauthn as webauthn_mod
 from octop.infra.auth.mfa.settings import passwordless_login_enabled
 from octop.infra.auth.tokens import (
+    MAX_SESSION_SECONDS,
     MFA_TOKEN_TTL_SECONDS,
     PURPOSE_ACCESS,
     PURPOSE_MFA,
@@ -32,8 +33,9 @@ MFA_LOCKOUT_SECONDS = 900
 
 
 class MfaService:
-    def __init__(self, services: SharedServices) -> None:
+    def __init__(self, services: SharedServices, *, session_started_at: int | None = None) -> None:
         self._s = services
+        self._session_started_at = session_started_at
 
     # --- status / factors -------------------------------------------------
 
@@ -89,7 +91,10 @@ class MfaService:
         secret = self._s.secret_repo.get("jwt")
         if secret is None:
             raise OctopError(ErrorCode.INTERNAL_ERROR, "jwt secret missing")
-        ttl = int(self._s.config.access_token_ttl_seconds)
+        started = self._session_started_at
+        ttl = min(int(self._s.config.access_token_ttl_seconds), MAX_SESSION_SECONDS)
+        if started is not None:
+            ttl = min(ttl, started + MAX_SESSION_SECONDS - int(time.time()))
         token = sign_token(
             secret,
             sub=user.id,
@@ -97,6 +102,7 @@ class MfaService:
             role=user.role,
             purpose=PURPOSE_ACCESS,
             ttl_seconds=ttl,
+            session_started_at=self._session_started_at,
             mfa_version=self._mfa_version(user.id),
             password_version=self._password_version(user.id),
         )

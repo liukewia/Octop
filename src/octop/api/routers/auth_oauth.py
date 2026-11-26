@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
+from octop.api.common.login_policy import LoginConsentBody
 from octop.api.common.public_base import resolve_public_base
 from octop.api.common.sso_cookie import (
     cookie_state,
@@ -19,6 +20,7 @@ from octop.api.common.sso_cookie import (
 )
 from octop.api.deps import current_user, get_server
 from octop.api.routers.auth_oidc import exchange_login_code_response
+from octop.infra.auth.login_policy import ensure_login_consent
 from octop.infra.auth.sso.service import SsoService
 from octop.infra.errors import ErrorCode, OctopError
 from octop.infra.users.identity import User
@@ -47,7 +49,7 @@ router = APIRouter()
 SsoKind = Literal["oidc", "feishu", "dingtalk", "wecom"]
 
 
-class OauthStartBody(BaseModel):
+class OauthStartBody(LoginConsentBody):
     kind: SsoKind
     redirect_after: str | None = None
 
@@ -96,6 +98,7 @@ async def oauth_start(
     server: Any = Depends(get_server),
 ) -> JSONResponse:
     """Create login state and return the identity provider authorization URL."""
+    ensure_login_consent(server.services.config, body.consent_accepted)
     service = _service(server)
     try:
         started = await asyncio.get_running_loop().run_in_executor(

@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
+from octop.api.common.login_policy import LoginConsentBody
 from octop.api.common.public_base import resolve_public_base
 from octop.api.common.sso_cookie import (
     cookie_state,
@@ -19,14 +20,15 @@ from octop.api.common.sso_cookie import (
 )
 from octop.api.deps import get_server, require_permission, sign_token
 from octop.api.routers.auth import _user_json
+from octop.infra.auth.login_policy import ensure_login_consent
 from octop.infra.auth.sso.service import SsoService
-from octop.infra.auth.tokens import PURPOSE_ACCESS
+from octop.infra.auth.tokens import MAX_SESSION_SECONDS, PURPOSE_ACCESS
 from octop.infra.errors import ErrorCode, OctopError
 
 router = APIRouter()
 
 
-class OidcStartBody(BaseModel):
+class OidcStartBody(LoginConsentBody):
     redirect_after: str | None = None
 
 
@@ -68,7 +70,7 @@ async def exchange_login_code_response(code: str, server: Any) -> dict[str, Any]
     except ValueError as exc:
         raise _bad_request(exc) from exc
     secret = server.services.secret_repo.get("jwt")
-    ttl = server.services.config.access_token_ttl_seconds
+    ttl = min(server.services.config.access_token_ttl_seconds, MAX_SESSION_SECONDS)
     row = server.services.user_repo.get(user.id)
     mfa_version = int(row.mfa_version) if row is not None else 0
     password_version = int(row.password_version) if row is not None else 0
@@ -102,6 +104,7 @@ async def oidc_start(
     server: Any = Depends(get_server),
 ) -> JSONResponse:
     """Create OIDC state and return the identity provider authorization URL."""
+    ensure_login_consent(server.services.config, body.consent_accepted)
     service = _service(server)
     try:
         started = await asyncio.get_running_loop().run_in_executor(

@@ -10,8 +10,15 @@ from fastapi import APIRouter, Depends, File, Request, Response, UploadFile
 from pydantic import BaseModel, Field
 
 from octop.api.common.client_ip import resolve_client_ip
-from octop.api.deps import ACCESS_TOKEN_RESPONSE_HEADER, current_user, get_server
+from octop.api.common.login_policy import LoginConsentBody
+from octop.api.deps import (
+    ACCESS_TOKEN_RESPONSE_HEADER,
+    current_user,
+    get_server,
+    request_session_started_at,
+)
 from octop.infra.auth.captcha import current_env, ensure_captcha, load_effective, public_config
+from octop.infra.auth.login_policy import ensure_login_consent, public_login_policy
 from octop.infra.auth.mfa import MfaService
 from octop.infra.errors import ErrorCode, OctopError
 from octop.infra.users.email import normalize_email
@@ -76,7 +83,7 @@ def me_payload(user: Any, server: Any) -> dict[str, Any]:
     return payload
 
 
-class LoginBody(BaseModel):
+class LoginBody(LoginConsentBody):
     username: str
     password: str
     captcha_token: str | None = Field(default=None, max_length=4096)
@@ -183,6 +190,11 @@ def _raise_if_throttled(retry_after: int) -> None:
     )
 
 
+@router.get("/login-policy", summary="Public login agreement and privacy policy links")
+async def login_policy(server: Any = Depends(get_server)) -> dict[str, bool | str]:
+    return public_login_policy(server.services.config)
+
+
 @router.post("/login", summary="Sign in")
 async def login(
     body: LoginBody, request: Request, server: Any = Depends(get_server)
@@ -197,6 +209,7 @@ async def login(
     """
     if server.user_manager.count() == 0:
         raise OctopError(ErrorCode.SETUP_REQUIRED, "initial admin not created")
+    ensure_login_consent(server.services.config, body.consent_accepted)
     server.user_manager.raise_if_login_locked(body.username)
     effective = load_effective(
         server.services.settings_repo,
@@ -245,6 +258,7 @@ async def me(
 @router.post("/change-password", status_code=204, summary="Change password")
 async def change_password(
     body: ChangePasswordBody,
+    request: Request,
     user: Any = Depends(current_user),
     server: Any = Depends(get_server),
 ) -> Response:
@@ -254,7 +268,9 @@ async def change_password(
     replacement in ``X-Octop-Access-Token`` so the current client stays signed in.
     """
     await server.user_manager.change_password(user.username, body.old_password, body.new_password)
-    token, _ttl = MfaService(server.services).mint_access_token(user)
+    token, _ttl = MfaService(
+        server.services, session_started_at=request_session_started_at(request, server)
+    ).mint_access_token(user)
     response = Response(status_code=204)
     response.headers[ACCESS_TOKEN_RESPONSE_HEADER] = token
     return response

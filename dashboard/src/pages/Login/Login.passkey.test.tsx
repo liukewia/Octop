@@ -10,6 +10,13 @@ vi.mock("../../context/ThemeContext", () => ({
 
 vi.mock("../../api/modules/auth", () => ({
   authApi: {
+    getLoginPolicy: () =>
+      Promise.resolve({
+        enabled: false,
+        ready: false,
+        user_agreement_url: "",
+        privacy_policy_url: "",
+      }),
     getAuthStatus: () => Promise.resolve({ setup_required: false }),
     getOauthStatus: () => Promise.resolve({ providers: [] }),
     getCaptcha: () => Promise.resolve({ provider: "none" }),

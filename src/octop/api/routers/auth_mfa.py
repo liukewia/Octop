@@ -9,8 +9,10 @@ from fastapi import APIRouter, Depends, Header, Request
 from pydantic import BaseModel, Field
 
 from octop.api.common.client_ip import resolve_client_ip
-from octop.api.deps import current_user, get_server
+from octop.api.common.login_policy import LoginConsentBody
+from octop.api.deps import current_user, get_server, request_session_started_at
 from octop.api.routers.auth import _user_json, me_payload
+from octop.infra.auth.login_policy import ensure_login_consent
 from octop.infra.auth.mfa import MfaService
 from octop.infra.auth.mfa import reauth as reauth_mod
 from octop.infra.auth.mfa.settings import passkey_block_reason, passwordless_login_enabled
@@ -19,8 +21,9 @@ from octop.infra.errors import ErrorCode, OctopError
 router = APIRouter()
 
 
-def _mfa(server: Any) -> MfaService:
-    return MfaService(server.services)
+def _mfa(server: Any, request: Request | None = None) -> MfaService:
+    started = request_session_started_at(request, server) if request is not None else None
+    return MfaService(server.services, session_started_at=started)
 
 
 def _page_origin(request: Request) -> str:
@@ -73,7 +76,7 @@ class MfaPasskeyOptionsBody(BaseModel):
     mfa_token: str = Field(min_length=1)
 
 
-class PasskeyLoginVerifyBody(BaseModel):
+class PasskeyLoginVerifyBody(LoginConsentBody):
     credential: dict[str, Any]
 
 
@@ -183,6 +186,7 @@ async def passkey_login_verify(
     request: Request,
     server: Any = Depends(get_server),
 ) -> dict[str, Any]:
+    ensure_login_consent(server.services.config, body.consent_accepted)
     result = _mfa(server).passkey_login_verify(
         credential=body.credential,
         origin=_origin(request),
@@ -221,19 +225,21 @@ async def totp_begin(
 
 @router.post("/mfa/totp/confirm", summary="Confirm TOTP enrollment")
 async def totp_confirm(
+    request: Request,
     body: TotpConfirmBody,
     user: Any = Depends(current_user),
     server: Any = Depends(get_server),
     x_octop_reauth: str | None = Header(None, alias="X-Octop-Reauth"),
 ) -> dict[str, Any]:
     token = _reauth_token(header=x_octop_reauth, body_token=body.reauth_token)
-    result = _mfa(server).totp_confirm(user, reauth_token=token, code=body.code)
+    result = _mfa(server, request).totp_confirm(user, reauth_token=token, code=body.code)
     result["user"] = me_payload(user, server)
     return result
 
 
 @router.delete("/mfa/totp", summary="Disable TOTP")
 async def totp_disable(
+    request: Request,
     body: ReauthTokenBody | None = None,
     user: Any = Depends(current_user),
     server: Any = Depends(get_server),
@@ -241,7 +247,7 @@ async def totp_disable(
 ) -> dict[str, Any]:
     body = body or ReauthTokenBody()
     token = _reauth_token(header=x_octop_reauth, body_token=body.reauth_token)
-    result = _mfa(server).totp_disable(user, reauth_token=token)
+    result = _mfa(server, request).totp_disable(user, reauth_token=token)
     result["user"] = me_payload(user, server)
     return result
 
@@ -267,7 +273,7 @@ async def passkey_register_verify(
     x_octop_reauth: str | None = Header(None, alias="X-Octop-Reauth"),
 ) -> dict[str, Any]:
     token = _reauth_token(header=x_octop_reauth, body_token=body.reauth_token)
-    result = _mfa(server).passkey_register_verify(
+    result = _mfa(server, request).passkey_register_verify(
         user,
         reauth_token=token,
         credential=body.credential,
@@ -283,6 +289,7 @@ async def passkey_register_verify(
     summary="Remove a passkey",
 )
 async def passkey_delete(
+    request: Request,
     credential_id: str,
     body: ReauthTokenBody | None = None,
     user: Any = Depends(current_user),
@@ -291,19 +298,22 @@ async def passkey_delete(
 ) -> dict[str, Any]:
     body = body or ReauthTokenBody()
     token = _reauth_token(header=x_octop_reauth, body_token=body.reauth_token)
-    result = _mfa(server).passkey_delete(user, reauth_token=token, credential_id=credential_id)
+    result = _mfa(server, request).passkey_delete(
+        user, reauth_token=token, credential_id=credential_id
+    )
     result["user"] = me_payload(user, server)
     return result
 
 
 @router.post("/mfa/recovery/regenerate", summary="Regenerate recovery codes")
 async def recovery_regenerate(
+    request: Request,
     body: ReauthTokenBody,
     user: Any = Depends(current_user),
     server: Any = Depends(get_server),
     x_octop_reauth: str | None = Header(None, alias="X-Octop-Reauth"),
 ) -> dict[str, Any]:
     token = _reauth_token(header=x_octop_reauth, body_token=body.reauth_token)
-    result = _mfa(server).recovery_regenerate(user, reauth_token=token)
+    result = _mfa(server, request).recovery_regenerate(user, reauth_token=token)
     result["user"] = me_payload(user, server)
     return result
